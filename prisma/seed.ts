@@ -6,7 +6,9 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🌱 Starting MatchLab multi-tenant database seed...");
 
+  // ---------------------------------------------------------------------------
   // 1. Super Admin Account
+  // ---------------------------------------------------------------------------
   const superAdmin = await prisma.user.upsert({
     where: { email: "admin@matchlab.id" },
     update: {
@@ -25,7 +27,9 @@ async function main() {
   });
   console.log(`✅ Super Admin created/updated: ${superAdmin.email}`);
 
+  // ---------------------------------------------------------------------------
   // 2. Organization 1: ASE Research Lab
+  // ---------------------------------------------------------------------------
   const aseOrg = await prisma.organization.upsert({
     where: { slug: "aselab" },
     update: {
@@ -114,8 +118,8 @@ async function main() {
     },
   });
 
-  // Sample Requisition for ASE Lab
-  const aseJob = await prisma.jobRequisition.upsert({
+  // ASE Job 1: Senior Systems & Cloud Infrastructure Engineer
+  const aseJob1 = await prisma.jobRequisition.upsert({
     where: { slug: "aselab-senior-systems" },
     update: {
       title: "Senior Systems & Cloud Infrastructure Engineer",
@@ -179,9 +183,76 @@ async function main() {
       },
     },
   });
-  console.log(`✅ Job Requisition created/updated: ${aseJob.title}`);
+  console.log(`✅ Job Requisition created/updated: ${aseJob1.title}`);
 
+  // ASE Job 2: AI Systems & Distributed Computing Researcher
+  const aseJob2 = await prisma.jobRequisition.upsert({
+    where: { slug: "aselab-ai-researcher" },
+    update: {
+      title: "AI Systems & Distributed Computing Researcher",
+      organizationId: aseOrg.id,
+      rawUserPrompt: "Mencari asisten riset AI yang menguasai pipeline evaluasi LLM, fine-tuning PyTorch, dan eksperimen GPU cluster.",
+      maxTurns: 8,
+      isActive: true,
+      generatedSpec: {
+        roleSummary: "Mendesain benchmark komputasi model AI, pipeline sintesis dataset, dan arsitektur evaluasi otomatis.",
+        domainWeight: 60,
+        implicitWeight: 40,
+        requiredSkills: ["PyTorch", "Python", "LLM Evaluation", "CUDA", "FastAPI"],
+      },
+      scoringRubric: {
+        domainWeight: 60,
+        implicitWeight: 40,
+        domainTraits: [
+          { name: "AI & Model Evaluation", description: "Keahlian metrik evaluasi model (MMLU, HumanEval) dan fine-tuning", weight: 35 },
+          { name: "High-Throughput Pipelines", description: "Pengoptimalan throughput inferensi dan batch processing", weight: 25 },
+        ],
+        implicitTraits: [
+          { name: "Research Rigor", description: "Ketelitian mencatat log eksperimen dan integritas data", weight: 20 },
+          { name: "Academic Communication", description: "Kejelasan menyampaikan metodologi dan hipotesis penelitian", weight: 20 },
+        ],
+        probeScenarios: [
+          "Bagaimana Anda mendeteksi data contamination saat mengevaluasi benchmark penalaran model bahasa?",
+          "Bagaimana cara mengatasi CUDA Out of Memory saat training multi-GPU tanpa mengurangi batch size secara drastis?",
+        ],
+      },
+    },
+    create: {
+      title: "AI Systems & Distributed Computing Researcher",
+      slug: "aselab-ai-researcher",
+      organizationId: aseOrg.id,
+      rawUserPrompt: "Mencari asisten riset AI yang menguasai pipeline evaluasi LLM, fine-tuning PyTorch, dan eksperimen GPU cluster.",
+      maxTurns: 8,
+      isActive: true,
+      generatedSpec: {
+        roleSummary: "Mendesain benchmark komputasi model AI, pipeline sintesis dataset, dan arsitektur evaluasi otomatis.",
+        domainWeight: 60,
+        implicitWeight: 40,
+        requiredSkills: ["PyTorch", "Python", "LLM Evaluation", "CUDA", "FastAPI"],
+      },
+      scoringRubric: {
+        domainWeight: 60,
+        implicitWeight: 40,
+        domainTraits: [
+          { name: "AI & Model Evaluation", description: "Keahlian metrik evaluasi model (MMLU, HumanEval) dan fine-tuning", weight: 35 },
+          { name: "High-Throughput Pipelines", description: "Pengoptimalan throughput inferensi dan batch processing", weight: 25 },
+        ],
+        implicitTraits: [
+          { name: "Research Rigor", description: "Ketelitian mencatat log eksperimen dan integritas data", weight: 20 },
+          { name: "Academic Communication", description: "Kejelasan menyampaikan metodologi dan hipotesis penelitian", weight: 20 },
+        ],
+        probeScenarios: [
+          "Bagaimana Anda mendeteksi data contamination saat mengevaluasi benchmark penalaran model bahasa?",
+          "Bagaimana cara mengatasi CUDA Out of Memory saat training multi-GPU tanpa mengurangi batch size secara drastis?",
+        ],
+      },
+    },
+  });
+  console.log(`✅ Job Requisition created/updated: ${aseJob2.title}`);
+
+  // ---------------------------------------------------------------------------
   // 3. Organization 2: Nusantara Tech Startup
+  // ---------------------------------------------------------------------------
   const nusantaraOrg = await prisma.organization.upsert({
     where: { slug: "nusantara-tech" },
     update: {
@@ -237,8 +308,8 @@ async function main() {
     },
   });
 
-  // Sample Requisition for Nusantara Tech
-  const nusantaraJob = await prisma.jobRequisition.upsert({
+  // Nusantara Job 1: Fullstack Product Engineer
+  const nusantaraJob1 = await prisma.jobRequisition.upsert({
     where: { slug: "nusantara-fullstack-dev" },
     update: {
       title: "Fullstack Product Engineer (Next.js & TypeScript)",
@@ -302,9 +373,76 @@ async function main() {
       },
     },
   });
-  console.log(`✅ Job Requisition created/updated: ${nusantaraJob.title}`);
+  console.log(`✅ Job Requisition created/updated: ${nusantaraJob1.title}`);
 
-  // 4. Job Seeker 1: Dewi Lestari
+  // Nusantara Job 2: Backend Distributed Systems Engineer (Go)
+  const nusantaraJob2 = await prisma.jobRequisition.upsert({
+    where: { slug: "nusantara-backend-go" },
+    update: {
+      title: "Backend Distributed Systems Engineer (Go)",
+      organizationId: nusantaraOrg.id,
+      rawUserPrompt: "Mencari backend engineer Go berpengalaman dengan message queue Kafka, Redis caching, dan distributed database PostgreSQL untuk transaksi fintech berkecepatan tinggi.",
+      maxTurns: 8,
+      isActive: true,
+      generatedSpec: {
+        roleSummary: "Membangun sistem pembayaran real-time dengan skalabilitas jutaan transaksi per hari.",
+        domainWeight: 55,
+        implicitWeight: 45,
+        requiredSkills: ["Go", "Kafka", "PostgreSQL", "Redis", "Distributed Transactions"],
+      },
+      scoringRubric: {
+        domainWeight: 55,
+        implicitWeight: 45,
+        domainTraits: [
+          { name: "Concurrency & High Throughput", description: "Penguasaan Go goroutines, channels, dan lock contention", weight: 30 },
+          { name: "Transactional Integrity", description: "Paham 2-phase commit, idempotency, dan distributed locks", weight: 25 },
+        ],
+        implicitTraits: [
+          { name: "Engineering Rigor", description: "Testing intensif, error tracing, dan observability", weight: 25 },
+          { name: "Calm Under Outage", description: "Mitigasi kegagalan transaksi secara cepat dan teratur", weight: 20 },
+        ],
+        probeScenarios: [
+          "Bagaimana Anda menjamin transaksi tidak terduplikasi saat terjadi timeout network pada webhook penyedia pembayaran?",
+          "Ceritakan pengalaman Anda mengoptimalkan query Postgres yang mengalami deadlocks pada traffic puncak.",
+        ],
+      },
+    },
+    create: {
+      title: "Backend Distributed Systems Engineer (Go)",
+      slug: "nusantara-backend-go",
+      organizationId: nusantaraOrg.id,
+      rawUserPrompt: "Mencari backend engineer Go berpengalaman dengan message queue Kafka, Redis caching, dan distributed database PostgreSQL untuk transaksi fintech berkecepatan tinggi.",
+      maxTurns: 8,
+      isActive: true,
+      generatedSpec: {
+        roleSummary: "Membangun sistem pembayaran real-time dengan skalabilitas jutaan transaksi per hari.",
+        domainWeight: 55,
+        implicitWeight: 45,
+        requiredSkills: ["Go", "Kafka", "PostgreSQL", "Redis", "Distributed Transactions"],
+      },
+      scoringRubric: {
+        domainWeight: 55,
+        implicitWeight: 45,
+        domainTraits: [
+          { name: "Concurrency & High Throughput", description: "Penguasaan Go goroutines, channels, dan lock contention", weight: 30 },
+          { name: "Transactional Integrity", description: "Paham 2-phase commit, idempotency, dan distributed locks", weight: 25 },
+        ],
+        implicitTraits: [
+          { name: "Engineering Rigor", description: "Testing intensif, error tracing, dan observability", weight: 25 },
+          { name: "Calm Under Outage", description: "Mitigasi kegagalan transaksi secara cepat dan teratur", weight: 20 },
+        ],
+        probeScenarios: [
+          "Bagaimana Anda menjamin transaksi tidak terduplikasi saat terjadi timeout network pada webhook penyedia pembayaran?",
+          "Ceritakan pengalaman Anda mengoptimalkan query Postgres yang mengalami deadlocks pada traffic puncak.",
+        ],
+      },
+    },
+  });
+  console.log(`✅ Job Requisition created/updated: ${nusantaraJob2.title}`);
+
+  // ---------------------------------------------------------------------------
+  // 4. Job Seeker 1: Dewi Lestari (Senior Fullstack & Cloud)
+  // ---------------------------------------------------------------------------
   const dewiUser = await prisma.user.upsert({
     where: { email: "dewi@example.com" },
     update: {
@@ -340,35 +478,33 @@ async function main() {
       isOpenToPool: true,
     },
   });
-  console.log(`✅ Job Seeker 1 Profile created/updated: ${dewiUser.name}`);
+  console.log(`✅ Job Seeker 1 Profile: ${dewiUser.name}`);
 
-  // Sample Application for Dewi
-  const dewiApplication = await prisma.jobApplication.upsert({
+  // Dewi -> ASE Lab (Senior Systems): EVALUATED
+  const dewiAppAse = await prisma.jobApplication.upsert({
     where: {
       jobId_candidateProfileId: {
-        jobId: aseJob.id,
+        jobId: aseJob1.id,
         candidateProfileId: dewiProfile.id,
       },
     },
-    update: {
-      status: ApplicationStatus.EVALUATED,
-    },
+    update: { status: ApplicationStatus.EVALUATED },
     create: {
-      jobId: aseJob.id,
+      jobId: aseJob1.id,
       candidateProfileId: dewiProfile.id,
       status: ApplicationStatus.EVALUATED,
     },
   });
 
   await prisma.interviewSession.upsert({
-    where: { applicationId: dewiApplication.id },
+    where: { applicationId: dewiAppAse.id },
     update: {
       turnCount: 8,
       totalTokensUsed: 5820,
       completedAt: new Date(),
     },
     create: {
-      applicationId: dewiApplication.id,
+      applicationId: dewiAppAse.id,
       turnCount: 8,
       totalTokensUsed: 5820,
       startedAt: new Date(Date.now() - 3600000),
@@ -386,12 +522,24 @@ async function main() {
           content: "Halo! Saya sudah 3 tahun mengelola container Docker di server Linux Ubuntu. Terbiasa debugging memori leak dengan cgroups, journalctl, dan htop.",
           timestamp: new Date(Date.now() - 3400000).toISOString(),
         },
+        {
+          id: "m3",
+          role: "assistant",
+          content: "Bagus sekali. Misalkan satu container mengalami OOM-kill berulang kali dan mengganggu service lain di host yang sama. Bagaimana langkah investigasi dan isolasi Anda?",
+          timestamp: new Date(Date.now() - 3300000).toISOString(),
+        },
+        {
+          id: "m4",
+          role: "user",
+          content: "Pertama saya cek log kernel dmesg -T untuk konfirmasi OOM killer. Kedua, pasang limit eksplisit memory dan swap di docker compose. Ketiga, ambil heap snapshot service untuk profiling alokasi memori objek.",
+          timestamp: new Date(Date.now() - 3200000).toISOString(),
+        },
       ],
     },
   });
 
   await prisma.evaluation.upsert({
-    where: { applicationId: dewiApplication.id },
+    where: { applicationId: dewiAppAse.id },
     update: {
       matchScore: 91,
       domainScore: 94,
@@ -399,7 +547,7 @@ async function main() {
       evalTokensUsed: 1240,
       executiveSummary:
         "Kandidat menunjukkan penguasaan kuat terhadap containerization dan Linux internals. Komunikasi tenang, metodis, dan terstruktur dalam skenario incident response.",
-      greenFlags: ["Pengalaman praktis Linux & Docker kuat", "Rendah hati dan fokus pada akar masalah"],
+      greenFlags: ["Pengalaman praktis Linux & Docker kuat", "Rendah hati dan fokus pada akar masalah", "Prosedur insiden sistematis"],
       redFlags: [],
       finalInterviewProbes: ["Gali arsitektur cluster Kubernetes dan pipeline CI/CD yang pernah dikelola"],
       traitBreakdown: [
@@ -408,14 +556,14 @@ async function main() {
       ],
     },
     create: {
-      applicationId: dewiApplication.id,
+      applicationId: dewiAppAse.id,
       matchScore: 91,
       domainScore: 94,
       implicitBehaviorScore: 88,
       evalTokensUsed: 1240,
       executiveSummary:
         "Kandidat menunjukkan penguasaan kuat terhadap containerization dan Linux internals. Komunikasi tenang, metodis, dan terstruktur dalam skenario incident response.",
-      greenFlags: ["Pengalaman praktis Linux & Docker kuat", "Rendah hati dan fokus pada akar masalah"],
+      greenFlags: ["Pengalaman praktis Linux & Docker kuat", "Rendah hati dan fokus pada akar masalah", "Prosedur insiden sistematis"],
       redFlags: [],
       finalInterviewProbes: ["Gali arsitektur cluster Kubernetes dan pipeline CI/CD yang pernah dikelola"],
       traitBreakdown: [
@@ -425,7 +573,90 @@ async function main() {
     },
   });
 
-  // 5. Job Seeker 2: Fajar Pratama
+  // Dewi -> Nusantara Tech (Fullstack): SHORTLISTED
+  const dewiAppNusantara = await prisma.jobApplication.upsert({
+    where: {
+      jobId_candidateProfileId: {
+        jobId: nusantaraJob1.id,
+        candidateProfileId: dewiProfile.id,
+      },
+    },
+    update: { status: ApplicationStatus.SHORTLISTED },
+    create: {
+      jobId: nusantaraJob1.id,
+      candidateProfileId: dewiProfile.id,
+      status: ApplicationStatus.SHORTLISTED,
+    },
+  });
+
+  await prisma.interviewSession.upsert({
+    where: { applicationId: dewiAppNusantara.id },
+    update: {
+      turnCount: 8,
+      totalTokensUsed: 5200,
+      completedAt: new Date(),
+    },
+    create: {
+      applicationId: dewiAppNusantara.id,
+      turnCount: 8,
+      totalTokensUsed: 5200,
+      startedAt: new Date(Date.now() - 7200000),
+      completedAt: new Date(Date.now() - 3600000),
+      messages: [
+        {
+          id: "dn1",
+          role: "assistant",
+          content: "Halo Dewi! Ceritakan bagaimana Anda mengoptimalkan Core Web Vitals dan SSR hydration di Next.js App Router.",
+          timestamp: new Date(Date.now() - 7100000).toISOString(),
+        },
+        {
+          id: "dn2",
+          role: "user",
+          content: "Saya membagi komponen Server dan Client secara ketat, memanfaatkan Suspense boundaries untuk streaming, dan mengisolasi dynamic imports untuk bundle berat seperti charts.",
+          timestamp: new Date(Date.now() - 7000000).toISOString(),
+        },
+      ],
+    },
+  });
+
+  await prisma.evaluation.upsert({
+    where: { applicationId: dewiAppNusantara.id },
+    update: {
+      matchScore: 94,
+      domainScore: 96,
+      implicitBehaviorScore: 92,
+      evalTokensUsed: 1350,
+      executiveSummary:
+        "Kandidat ideal untuk posisi Fullstack Product Engineer. Memahami nuansa performa frontend modern serta arsitektur backend Next.js dengan matang.",
+      greenFlags: ["Penguasaan Next.js Server Components tinggi", "User-first thinking pada form checkout"],
+      redFlags: [],
+      finalInterviewProbes: ["Tanyakan preferensi state management untuk aplikasi fintech skala besar"],
+      traitBreakdown: [
+        { traitName: "Frontend Mastery", score: 96, reasoning: "Sangat fasih memisahkan server vs client components dan streaming SSR." },
+        { traitName: "Velocity & Agility", score: 92, reasoning: "Mampu menjelaskan release cycle cepat dan strategi rollback." },
+      ],
+    },
+    create: {
+      applicationId: dewiAppNusantara.id,
+      matchScore: 94,
+      domainScore: 96,
+      implicitBehaviorScore: 92,
+      evalTokensUsed: 1350,
+      executiveSummary:
+        "Kandidat ideal untuk posisi Fullstack Product Engineer. Memahami nuansa performa frontend modern serta arsitektur backend Next.js dengan matang.",
+      greenFlags: ["Penguasaan Next.js Server Components tinggi", "User-first thinking pada form checkout"],
+      redFlags: [],
+      finalInterviewProbes: ["Tanyakan preferensi state management untuk aplikasi fintech skala besar"],
+      traitBreakdown: [
+        { traitName: "Frontend Mastery", score: 96, reasoning: "Sangat fasih memisahkan server vs client components dan streaming SSR." },
+        { traitName: "Velocity & Agility", score: 92, reasoning: "Mampu menjelaskan release cycle cepat dan strategi rollback." },
+      ],
+    },
+  });
+
+  // ---------------------------------------------------------------------------
+  // 5. Job Seeker 2: Fajar Pratama (Junior AI/Backend)
+  // ---------------------------------------------------------------------------
   const fajarUser = await prisma.user.upsert({
     where: { email: "fajar@example.com" },
     update: {
@@ -461,35 +692,33 @@ async function main() {
       isOpenToPool: true,
     },
   });
-  console.log(`✅ Job Seeker 2 Profile created/updated: ${fajarUser.name}`);
+  console.log(`✅ Job Seeker 2 Profile: ${fajarUser.name}`);
 
-  // Sample Application for Fajar
-  const fajarApplication = await prisma.jobApplication.upsert({
+  // Fajar -> Nusantara Tech (Fullstack): IN_PROGRESS (turn 4/8)
+  const fajarAppNusantara = await prisma.jobApplication.upsert({
     where: {
       jobId_candidateProfileId: {
-        jobId: nusantaraJob.id,
+        jobId: nusantaraJob1.id,
         candidateProfileId: fajarProfile.id,
       },
     },
-    update: {
-      status: ApplicationStatus.IN_PROGRESS,
-    },
+    update: { status: ApplicationStatus.IN_PROGRESS },
     create: {
-      jobId: nusantaraJob.id,
+      jobId: nusantaraJob1.id,
       candidateProfileId: fajarProfile.id,
       status: ApplicationStatus.IN_PROGRESS,
     },
   });
 
   await prisma.interviewSession.upsert({
-    where: { applicationId: fajarApplication.id },
+    where: { applicationId: fajarAppNusantara.id },
     update: {
       turnCount: 4,
       totalTokensUsed: 2950,
       completedAt: null,
     },
     create: {
-      applicationId: fajarApplication.id,
+      applicationId: fajarAppNusantara.id,
       turnCount: 4,
       totalTokensUsed: 2950,
       startedAt: new Date(Date.now() - 1800000),
@@ -506,11 +735,568 @@ async function main() {
           content: "Halo! Saya biasa memakai FastAPI atau Next.js Route Handlers dengan connection pooling ke PostgreSQL serta caching di memory.",
           timestamp: new Date(Date.now() - 1600000).toISOString(),
         },
+        {
+          id: "mf3",
+          role: "assistant",
+          content: "Bagaimana Anda menangani race conditions saat dua user melakukan klaim kupon diskon terbatas secara bersamaan?",
+          timestamp: new Date(Date.now() - 1500000).toISOString(),
+        },
+        {
+          id: "mf4",
+          role: "user",
+          content: "Bisa menggunakan transaksi database dengan SELECT ... FOR UPDATE atau atomic decrement di Redis sebelum commit ke DB.",
+          timestamp: new Date(Date.now() - 1400000).toISOString(),
+        },
       ],
     },
   });
 
-  console.log("✨ Seed completed successfully!");
+  // Fajar -> ASE Lab (AI Researcher): IN_PROGRESS (turn 6/8)
+  const fajarAppAse = await prisma.jobApplication.upsert({
+    where: {
+      jobId_candidateProfileId: {
+        jobId: aseJob2.id,
+        candidateProfileId: fajarProfile.id,
+      },
+    },
+    update: { status: ApplicationStatus.IN_PROGRESS },
+    create: {
+      jobId: aseJob2.id,
+      candidateProfileId: fajarProfile.id,
+      status: ApplicationStatus.IN_PROGRESS,
+    },
+  });
+
+  await prisma.interviewSession.upsert({
+    where: { applicationId: fajarAppAse.id },
+    update: {
+      turnCount: 6,
+      totalTokensUsed: 4100,
+      completedAt: null,
+    },
+    create: {
+      applicationId: fajarAppAse.id,
+      turnCount: 6,
+      totalTokensUsed: 4100,
+      startedAt: new Date(Date.now() - 2500000),
+      messages: [
+        {
+          id: "fa1",
+          role: "assistant",
+          content: "Halo Fajar! Bisa ceritakan pipeline evaluasi LLM yang pernah Anda bangun atau gunakan dalam riset?",
+          timestamp: new Date(Date.now() - 2400000).toISOString(),
+        },
+        {
+          id: "fa2",
+          role: "user",
+          content: "Saya pernah membuat pipeline benchmark menggunakan lm-evaluation-harness dengan prompt templating custom untuk model bahasa Indonesia di HuggingFace.",
+          timestamp: new Date(Date.now() - 2300000).toISOString(),
+        },
+      ],
+    },
+  });
+
+  // ---------------------------------------------------------------------------
+  // 6. Job Seeker 3: Bagas Pratama (Staff Infrastructure & SRE Specialist)
+  // ---------------------------------------------------------------------------
+  const bagasUser = await prisma.user.upsert({
+    where: { email: "bagas@example.com" },
+    update: {
+      name: "Bagas Pratama",
+      systemRole: SystemRole.JOB_SEEKER,
+      isActive: true,
+      passwordHash: hashPassword("bagas123"),
+    },
+    create: {
+      name: "Bagas Pratama",
+      email: "bagas@example.com",
+      passwordHash: hashPassword("bagas123"),
+      systemRole: SystemRole.JOB_SEEKER,
+      isActive: true,
+    },
+  });
+
+  const bagasProfile = await prisma.candidateProfile.upsert({
+    where: { userId: bagasUser.id },
+    update: {
+      cvSummaryText:
+        "Staff Infrastructure Engineer with 6+ years specializing in Linux kernel tuning, high-performance distributed KV stores, eBPF telemetry, and zero-downtime database migrations.",
+      portfolioUrl: "https://github.com/bagaspratama-infra",
+      skills: ["Linux Kernel", "Go", "Docker", "Kubernetes", "PostgreSQL", "eBPF", "Kafka"],
+      isOpenToPool: true,
+    },
+    create: {
+      userId: bagasUser.id,
+      cvSummaryText:
+        "Staff Infrastructure Engineer with 6+ years specializing in Linux kernel tuning, high-performance distributed KV stores, eBPF telemetry, and zero-downtime database migrations.",
+      portfolioUrl: "https://github.com/bagaspratama-infra",
+      skills: ["Linux Kernel", "Go", "Docker", "Kubernetes", "PostgreSQL", "eBPF", "Kafka"],
+      isOpenToPool: true,
+    },
+  });
+  console.log(`✅ Job Seeker 3 Profile: ${bagasUser.name}`);
+
+  // Bagas -> ASE Lab (Senior Systems): SHORTLISTED (Score: 96)
+  const bagasAppAse = await prisma.jobApplication.upsert({
+    where: {
+      jobId_candidateProfileId: {
+        jobId: aseJob1.id,
+        candidateProfileId: bagasProfile.id,
+      },
+    },
+    update: { status: ApplicationStatus.SHORTLISTED },
+    create: {
+      jobId: aseJob1.id,
+      candidateProfileId: bagasProfile.id,
+      status: ApplicationStatus.SHORTLISTED,
+    },
+  });
+
+  await prisma.interviewSession.upsert({
+    where: { applicationId: bagasAppAse.id },
+    update: {
+      turnCount: 8,
+      totalTokensUsed: 6240,
+      completedAt: new Date(),
+    },
+    create: {
+      applicationId: bagasAppAse.id,
+      turnCount: 8,
+      totalTokensUsed: 6240,
+      startedAt: new Date(Date.now() - 5400000),
+      completedAt: new Date(Date.now() - 1800000),
+      messages: [
+        {
+          id: "ba1",
+          role: "assistant",
+          content: "Selamat datang Bagas. Bagaimana Anda mendiagnosis network latency spike antar-node di distributed cluster?",
+          timestamp: new Date(Date.now() - 5300000).toISOString(),
+        },
+        {
+          id: "ba2",
+          role: "user",
+          content: "Saya menggunakan eBPF tool seperti tcptop dan bcc tools untuk mengamati socket buffer queues dan TCP retransmissions pada kernel level sebelum memeriksa layer aplikasi.",
+          timestamp: new Date(Date.now() - 5200000).toISOString(),
+        },
+      ],
+    },
+  });
+
+  await prisma.evaluation.upsert({
+    where: { applicationId: bagasAppAse.id },
+    update: {
+      matchScore: 96,
+      domainScore: 98,
+      implicitBehaviorScore: 94,
+      evalTokensUsed: 1420,
+      executiveSummary:
+        "Kandidat kaliber Staff/Lead dengan penguasaan mendalam arsitektur kernel Linux dan sistem terdistribusi. Menunjukkan pola komunikasi berbasis data dan ketenangan tingkat tinggi saat insiden.",
+      greenFlags: ["Pemahaman mendalam eBPF dan networking stack Linux", "Root-cause analysis berorientasi sistem", "Kepemimpinan on-call teruji"],
+      redFlags: [],
+      finalInterviewProbes: ["Diskusikan ekspektasi kompensasi dan kesiapan memandu riset asisten lab mahasiswa"],
+      traitBreakdown: [
+        { traitName: "Containerization & Linux", score: 99, reasoning: "Menjelaskan mekanisme cgroups v2, namespace isolation, dan kernel parameters secara sempurna." },
+        { traitName: "Stress Tolerance & On-Call", score: 94, reasoning: "Memiliki playbook penanganan krisis infrastruktur yang sangat teruji." },
+      ],
+    },
+    create: {
+      applicationId: bagasAppAse.id,
+      matchScore: 96,
+      domainScore: 98,
+      implicitBehaviorScore: 94,
+      evalTokensUsed: 1420,
+      executiveSummary:
+        "Kandidat kaliber Staff/Lead dengan penguasaan mendalam arsitektur kernel Linux dan sistem terdistribusi. Menunjukkan pola komunikasi berbasis data dan ketenangan tingkat tinggi saat insiden.",
+      greenFlags: ["Pemahaman mendalam eBPF dan networking stack Linux", "Root-cause analysis berorientasi sistem", "Kepemimpinan on-call teruji"],
+      redFlags: [],
+      finalInterviewProbes: ["Diskusikan ekspektasi kompensasi dan kesiapan memandu riset asisten lab mahasiswa"],
+      traitBreakdown: [
+        { traitName: "Containerization & Linux", score: 99, reasoning: "Menjelaskan mekanisme cgroups v2, namespace isolation, dan kernel parameters secara sempurna." },
+        { traitName: "Stress Tolerance & On-Call", score: 94, reasoning: "Memiliki playbook penanganan krisis infrastruktur yang sangat teruji." },
+      ],
+    },
+  });
+
+  // Bagas -> Nusantara Tech (Backend Go): SHORTLISTED (Score: 95)
+  const bagasAppNusantaraGo = await prisma.jobApplication.upsert({
+    where: {
+      jobId_candidateProfileId: {
+        jobId: nusantaraJob2.id,
+        candidateProfileId: bagasProfile.id,
+      },
+    },
+    update: { status: ApplicationStatus.SHORTLISTED },
+    create: {
+      jobId: nusantaraJob2.id,
+      candidateProfileId: bagasProfile.id,
+      status: ApplicationStatus.SHORTLISTED,
+    },
+  });
+
+  await prisma.interviewSession.upsert({
+    where: { applicationId: bagasAppNusantaraGo.id },
+    update: {
+      turnCount: 8,
+      totalTokensUsed: 5900,
+      completedAt: new Date(),
+    },
+    create: {
+      applicationId: bagasAppNusantaraGo.id,
+      turnCount: 8,
+      totalTokensUsed: 5900,
+      startedAt: new Date(Date.now() - 4000000),
+      completedAt: new Date(Date.now() - 1000000),
+      messages: [
+        {
+          id: "bng1",
+          role: "assistant",
+          content: "Halo Bagas! Dalam arsitektur microservices pembayaran, bagaimana Anda mengimplementasikan pola Saga atau 2-phase commit untuk menjaga konsistensi?",
+          timestamp: new Date(Date.now() - 3900000).toISOString(),
+        },
+        {
+          id: "bng2",
+          role: "user",
+          content: "Saya lebih memilih Orchestration-based Saga dengan outbox pattern di PostgreSQL dan Kafka untuk event publishing, menjamin at-least-once delivery dengan idempotency key di setiap consumer.",
+          timestamp: new Date(Date.now() - 3800000).toISOString(),
+        },
+      ],
+    },
+  });
+
+  await prisma.evaluation.upsert({
+    where: { applicationId: bagasAppNusantaraGo.id },
+    update: {
+      matchScore: 95,
+      domainScore: 97,
+      implicitBehaviorScore: 93,
+      evalTokensUsed: 1380,
+      executiveSummary:
+        "Sangat menguasai pola sistem terdistribusi perbankan dan transaksi e-commerce. Desain idempotency dan penanganan timeout transaksional sangat matang.",
+      greenFlags: ["Pemahaman transactional outbox pattern sempurna", "Pengalaman optimasi throughput Kafka"],
+      redFlags: [],
+      finalInterviewProbes: ["Tanyakan preferensi observabilitas open-telemetry vs custom metrics collector"],
+      traitBreakdown: [
+        { traitName: "Concurrency & High Throughput", score: 98, reasoning: "Paham betul alokasi memori runtime Go dan pencegahan goroutine leaks." },
+        { traitName: "Transactional Integrity", score: 96, reasoning: "Pola Saga orchestration dengan outbox pattern sangat tepat sasaran." },
+      ],
+    },
+    create: {
+      applicationId: bagasAppNusantaraGo.id,
+      matchScore: 95,
+      domainScore: 97,
+      implicitBehaviorScore: 93,
+      evalTokensUsed: 1380,
+      executiveSummary:
+        "Sangat menguasai pola sistem terdistribusi perbankan dan transaksi e-commerce. Desain idempotency dan penanganan timeout transaksional sangat matang.",
+      greenFlags: ["Pemahaman transactional outbox pattern sempurna", "Pengalaman optimasi throughput Kafka"],
+      redFlags: [],
+      finalInterviewProbes: ["Tanyakan preferensi observabilitas open-telemetry vs custom metrics collector"],
+      traitBreakdown: [
+        { traitName: "Concurrency & High Throughput", score: 98, reasoning: "Paham betul alokasi memori runtime Go dan pencegahan goroutine leaks." },
+        { traitName: "Transactional Integrity", score: 96, reasoning: "Pola Saga orchestration dengan outbox pattern sangat tepat sasaran." },
+      ],
+    },
+  });
+
+  // ---------------------------------------------------------------------------
+  // 7. Job Seeker 4: Aisyah Putri (Modern Frontend & UX Engineer)
+  // ---------------------------------------------------------------------------
+  const aisyahUser = await prisma.user.upsert({
+    where: { email: "aisyah@example.com" },
+    update: {
+      name: "Aisyah Putri",
+      systemRole: SystemRole.JOB_SEEKER,
+      isActive: true,
+      passwordHash: hashPassword("aisyah123"),
+    },
+    create: {
+      name: "Aisyah Putri",
+      email: "aisyah@example.com",
+      passwordHash: hashPassword("aisyah123"),
+      systemRole: SystemRole.JOB_SEEKER,
+      isActive: true,
+    },
+  });
+
+  const aisyahProfile = await prisma.candidateProfile.upsert({
+    where: { userId: aisyahUser.id },
+    update: {
+      cvSummaryText:
+        "Frontend Engineer specialized in React 19, Next.js, Web Performance, Design Systems, and Accessible User Interfaces (WCAG 2.1 AA).",
+      portfolioUrl: "https://aisyah.design/dev",
+      skills: ["React 19", "Next.js", "Tailwind CSS", "TypeScript", "UI/UX", "Web Performance"],
+      isOpenToPool: true,
+    },
+    create: {
+      userId: aisyahUser.id,
+      cvSummaryText:
+        "Frontend Engineer specialized in React 19, Next.js, Web Performance, Design Systems, and Accessible User Interfaces (WCAG 2.1 AA).",
+      portfolioUrl: "https://aisyah.design/dev",
+      skills: ["React 19", "Next.js", "Tailwind CSS", "TypeScript", "UI/UX", "Web Performance"],
+      isOpenToPool: true,
+    },
+  });
+  console.log(`✅ Job Seeker 4 Profile: ${aisyahUser.name}`);
+
+  // Aisyah -> Nusantara Tech (Fullstack): EVALUATED (Score: 89)
+  const aisyahAppNusantara = await prisma.jobApplication.upsert({
+    where: {
+      jobId_candidateProfileId: {
+        jobId: nusantaraJob1.id,
+        candidateProfileId: aisyahProfile.id,
+      },
+    },
+    update: { status: ApplicationStatus.EVALUATED },
+    create: {
+      jobId: nusantaraJob1.id,
+      candidateProfileId: aisyahProfile.id,
+      status: ApplicationStatus.EVALUATED,
+    },
+  });
+
+  await prisma.interviewSession.upsert({
+    where: { applicationId: aisyahAppNusantara.id },
+    update: {
+      turnCount: 8,
+      totalTokensUsed: 5410,
+      completedAt: new Date(),
+    },
+    create: {
+      applicationId: aisyahAppNusantara.id,
+      turnCount: 8,
+      totalTokensUsed: 5410,
+      startedAt: new Date(Date.now() - 4800000),
+      completedAt: new Date(Date.now() - 2000000),
+      messages: [
+        {
+          id: "ap1",
+          role: "assistant",
+          content: "Halo Aisyah! Bagaimana Anda menyeimbangkan fluid micro-interactions dengan performa render 60fps di mobile browser?",
+          timestamp: new Date(Date.now() - 4700000).toISOString(),
+        },
+        {
+          id: "ap2",
+          role: "user",
+          content: "Saya prioritaskan CSS transforms dan opacity yang terakselerasi GPU (will-change), menghindari layout thrashing, dan mengaudit frame rate menggunakan Chrome DevTools Performance panel.",
+          timestamp: new Date(Date.now() - 4600000).toISOString(),
+        },
+      ],
+    },
+  });
+
+  await prisma.evaluation.upsert({
+    where: { applicationId: aisyahAppNusantara.id },
+    update: {
+      matchScore: 89,
+      domainScore: 92,
+      implicitBehaviorScore: 86,
+      evalTokensUsed: 1290,
+      executiveSummary:
+        "Kandidat kuat dengan kepekaan desain antarmuka dan web accessibility yang sangat tinggi. Sangat tepat untuk pengembangan produk B2C yang sensitif terhadap kepuasan pengguna.",
+      greenFlags: ["Perhatian luar biasa pada user empathy dan aksesibilitas", "Pemahaman optimasi render pipeline browser"],
+      redFlags: [],
+      finalInterviewProbes: ["Gali pemahaman arsitektur database relasional dan optimasi query PostgreSQL"],
+      traitBreakdown: [
+        { traitName: "Frontend Mastery", score: 95, reasoning: "Sangat menguasai CSS rendering tree dan rendering lifecycle Next.js." },
+        { traitName: "User Empathy", score: 92, reasoning: "Menyertakan pertimbangan pengguna berkebutuhan khusus dan slow-network fallbacks." },
+      ],
+    },
+    create: {
+      applicationId: aisyahAppNusantara.id,
+      matchScore: 89,
+      domainScore: 92,
+      implicitBehaviorScore: 86,
+      evalTokensUsed: 1290,
+      executiveSummary:
+        "Kandidat kuat dengan kepekaan desain antarmuka dan web accessibility yang sangat tinggi. Sangat tepat untuk pengembangan produk B2C yang sensitif terhadap kepuasan pengguna.",
+      greenFlags: ["Perhatian luar biasa pada user empathy dan aksesibilitas", "Pemahaman optimasi render pipeline browser"],
+      redFlags: [],
+      finalInterviewProbes: ["Gali pemahaman arsitektur database relasional dan optimasi query PostgreSQL"],
+      traitBreakdown: [
+        { traitName: "Frontend Mastery", score: 95, reasoning: "Sangat menguasai CSS rendering tree dan rendering lifecycle Next.js." },
+        { traitName: "User Empathy", score: 92, reasoning: "Menyertakan pertimbangan pengguna berkebutuhan khusus dan slow-network fallbacks." },
+      ],
+    },
+  });
+
+  // ---------------------------------------------------------------------------
+  // 8. Job Seeker 5: Rizky Ramadhan (Entry-level / Needs Improvement)
+  // ---------------------------------------------------------------------------
+  const rizkyUser = await prisma.user.upsert({
+    where: { email: "rizky@example.com" },
+    update: {
+      name: "Rizky Ramadhan",
+      systemRole: SystemRole.JOB_SEEKER,
+      isActive: true,
+      passwordHash: hashPassword("rizky123"),
+    },
+    create: {
+      name: "Rizky Ramadhan",
+      email: "rizky@example.com",
+      passwordHash: hashPassword("rizky123"),
+      systemRole: SystemRole.JOB_SEEKER,
+      isActive: true,
+    },
+  });
+
+  const rizkyProfile = await prisma.candidateProfile.upsert({
+    where: { userId: rizkyUser.id },
+    update: {
+      cvSummaryText:
+        "Junior Web Developer familiar with HTML/CSS, basic JavaScript, Express.js tutorials, and simple MySQL queries.",
+      portfolioUrl: "https://github.com/rizky-webdev",
+      skills: ["JavaScript", "HTML", "CSS", "Express.js", "MySQL"],
+      isOpenToPool: true,
+    },
+    create: {
+      userId: rizkyUser.id,
+      cvSummaryText:
+        "Junior Web Developer familiar with HTML/CSS, basic JavaScript, Express.js tutorials, and simple MySQL queries.",
+      portfolioUrl: "https://github.com/rizky-webdev",
+      skills: ["JavaScript", "HTML", "CSS", "Express.js", "MySQL"],
+      isOpenToPool: true,
+    },
+  });
+  console.log(`✅ Job Seeker 5 Profile: ${rizkyUser.name}`);
+
+  // Rizky -> ASE Lab (Senior Systems): REJECTED (Score: 52)
+  const rizkyAppAse = await prisma.jobApplication.upsert({
+    where: {
+      jobId_candidateProfileId: {
+        jobId: aseJob1.id,
+        candidateProfileId: rizkyProfile.id,
+      },
+    },
+    update: { status: ApplicationStatus.REJECTED },
+    create: {
+      jobId: aseJob1.id,
+      candidateProfileId: rizkyProfile.id,
+      status: ApplicationStatus.REJECTED,
+    },
+  });
+
+  await prisma.interviewSession.upsert({
+    where: { applicationId: rizkyAppAse.id },
+    update: {
+      turnCount: 8,
+      totalTokensUsed: 4320,
+      completedAt: new Date(),
+    },
+    create: {
+      applicationId: rizkyAppAse.id,
+      turnCount: 8,
+      totalTokensUsed: 4320,
+      startedAt: new Date(Date.now() - 6000000),
+      completedAt: new Date(Date.now() - 3000000),
+      messages: [
+        {
+          id: "rr1",
+          role: "assistant",
+          content: "Halo Rizky! Bisakah Anda jelaskan bagaimana cara mengonfigurasi Docker networking host mode vs bridge?",
+          timestamp: new Date(Date.now() - 5900000).toISOString(),
+        },
+        {
+          id: "rr2",
+          role: "user",
+          content: "Saya biasanya pakai docker run biasa saja kak, belum pernah setting network custom di Linux.",
+          timestamp: new Date(Date.now() - 5800000).toISOString(),
+        },
+      ],
+    },
+  });
+
+  await prisma.evaluation.upsert({
+    where: { applicationId: rizkyAppAse.id },
+    update: {
+      matchScore: 52,
+      domainScore: 46,
+      implicitBehaviorScore: 58,
+      evalTokensUsed: 1100,
+      executiveSummary:
+        "Kandidat belum memenuhi kualifikasi teknis minimum untuk Senior Systems Engineer. Pemahaman Linux networking dan container internals masih di tingkat pemula.",
+      greenFlags: ["Jujur mengakui batasan pengetahuan"],
+      redFlags: ["Tidak memiliki pengalaman praktis Linux server production", "Jawaban dangkal terkait isolasi cgroups dan failure recovery"],
+      finalInterviewProbes: ["Sarankan program pelatihan magang dasar sebelum melamar posisi Senior"],
+      traitBreakdown: [
+        { traitName: "Containerization & Linux", score: 45, reasoning: "Hanya familiar dengan perintah dasar docker run tanpa pemahaman kernel isolasi." },
+        { traitName: "Stress Tolerance & On-Call", score: 58, reasoning: "Belum memiliki pengalaman menghadapi production incident di luar jam kerja." },
+      ],
+    },
+    create: {
+      applicationId: rizkyAppAse.id,
+      matchScore: 52,
+      domainScore: 46,
+      implicitBehaviorScore: 58,
+      evalTokensUsed: 1100,
+      executiveSummary:
+        "Kandidat belum memenuhi kualifikasi teknis minimum untuk Senior Systems Engineer. Pemahaman Linux networking dan container internals masih di tingkat pemula.",
+      greenFlags: ["Jujur mengakui batasan pengetahuan"],
+      redFlags: ["Tidak memiliki pengalaman praktis Linux server production", "Jawaban dangkal terkait isolasi cgroups dan failure recovery"],
+      finalInterviewProbes: ["Sarankan program pelatihan magang dasar sebelum melamar posisi Senior"],
+      traitBreakdown: [
+        { traitName: "Containerization & Linux", score: 45, reasoning: "Hanya familiar dengan perintah dasar docker run tanpa pemahaman kernel isolasi." },
+        { traitName: "Stress Tolerance & On-Call", score: 58, reasoning: "Belum memiliki pengalaman menghadapi production incident di luar jam kerja." },
+      ],
+    },
+  });
+
+  // ---------------------------------------------------------------------------
+  // 9. Job Seeker 6: Dimas Suryo (Fresh Applicant: REGISTERED)
+  // ---------------------------------------------------------------------------
+  const dimasUser = await prisma.user.upsert({
+    where: { email: "dimas@example.com" },
+    update: {
+      name: "Dimas Suryo",
+      systemRole: SystemRole.JOB_SEEKER,
+      isActive: true,
+      passwordHash: hashPassword("dimas123"),
+    },
+    create: {
+      name: "Dimas Suryo",
+      email: "dimas@example.com",
+      passwordHash: hashPassword("dimas123"),
+      systemRole: SystemRole.JOB_SEEKER,
+      isActive: true,
+    },
+  });
+
+  const dimasProfile = await prisma.candidateProfile.upsert({
+    where: { userId: dimasUser.id },
+    update: {
+      cvSummaryText:
+        "Aspiring Cloud DevOps enthusiast with certifications in AWS Cloud Practitioner and Terraform basics.",
+      portfolioUrl: "https://linkedin.com/in/dimassuryo-devops",
+      skills: ["AWS", "Terraform", "Docker", "Linux", "Bash"],
+      isOpenToPool: true,
+    },
+    create: {
+      userId: dimasUser.id,
+      cvSummaryText:
+        "Aspiring Cloud DevOps enthusiast with certifications in AWS Cloud Practitioner and Terraform basics.",
+      portfolioUrl: "https://linkedin.com/in/dimassuryo-devops",
+      skills: ["AWS", "Terraform", "Docker", "Linux", "Bash"],
+      isOpenToPool: true,
+    },
+  });
+  console.log(`✅ Job Seeker 6 Profile: ${dimasUser.name}`);
+
+  // Dimas -> ASE Lab (Senior Systems): REGISTERED (Waiting for candidate to begin interview)
+  await prisma.jobApplication.upsert({
+    where: {
+      jobId_candidateProfileId: {
+        jobId: aseJob1.id,
+        candidateProfileId: dimasProfile.id,
+      },
+    },
+    update: { status: ApplicationStatus.REGISTERED },
+    create: {
+      jobId: aseJob1.id,
+      candidateProfileId: dimasProfile.id,
+      status: ApplicationStatus.REGISTERED,
+    },
+  });
+
+  console.log("✨ Seed completed successfully! All organizations, jobs, profiles, and applications are up to date.");
 }
 
 main()

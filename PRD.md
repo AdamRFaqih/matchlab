@@ -7,6 +7,7 @@ In this upgraded evolution, MatchLab expands into a **full Multi-Tenant SaaS and
 - Reusable Job Seeker accounts with unified candidate profiles across multiple openings.
 - Multi-tier Role-Based Access Control (RBAC).
 - Super Admin system oversight for platform-wide metrics, tenant management, and token cost tracking.
+- Open Talent Marketplace & Candidate Portal for transparent two-way matchmaking.
 
 ---
 
@@ -40,7 +41,7 @@ In this upgraded evolution, MatchLab expands into a **full Multi-Tenant SaaS and
   - Owns a persistent `CandidateProfile` (`cvSummaryText`, `portfolioUrl`, `skills`, `isOpenToPool`).
   - Applies to job requisitions across different organizations without re-entering basic qualifications.
   - **Flow B:** Participates in AI-guided conversational screening interviews (capped at 8 turns).
-  - Tracks screening progress and receives feedback probes.
+  - **Flow E:** Explores public opportunities on the Job Board (`/jobs`) and monitors scorecard progress via Candidate Dashboard (`/candidate/dashboard`).
 
 ---
 
@@ -61,12 +62,17 @@ In this upgraded evolution, MatchLab expands into a **full Multi-Tenant SaaS and
 ### Flow C: Two-Way Matchmaking & Decision Hub (Org Admin / Division Lead)
 1. AI Evaluator analyzes transcript against the job rubric.
 2. Produces composite `matchScore` (0–100), domain score, implicit behavior score, flags, and executive summary.
-3. Leads review the ranked leaderboard and advance top talent.
+3. Leads review the ranked leaderboard and advance top talent (`SHORTLISTED`, `REJECTED`).
 
 ### Flow D: Multi-Tenancy & Platform Oversight (Super Admin)
 1. Super Admin accesses `/super-admin` control panel.
 2. Monitors total companies, job seekers, active listings, and LLM token expenditures in Rupiah (IDR).
 3. Verifies new organizations, modifies quotas, and moderates user accounts.
+
+### Flow E: Talent Marketplace & Candidate Portal (Job Seeker)
+1. Job Seeker accesses `/jobs` to discover active requisitions across verified organizations.
+2. Navigates to `/candidate/dashboard` to track progress across all applications and review AI evaluation feedback probes.
+3. Updates qualifications, skills tags, and talent pool visibility via `/candidate/profile`.
 
 ---
 
@@ -75,4 +81,7 @@ In this upgraded evolution, MatchLab expands into a **full Multi-Tenant SaaS and
 - `Organization`: Tenant entity with `planTier`, `applicantQuota`, `cultureDescription`, and `isVerified`.
 - `OrganizationMember`: M-to-N join table assigning `User` to `Organization` with `orgRole` (`ORG_ADMIN`, `DIVISION_LEAD`).
 - `CandidateProfile`: 1-to-1 extension of `User` for `JOB_SEEKER`.
+- `JobRequisition`: Tenant-scoped position specification and rubric.
 - `JobApplication`: Connection between `CandidateProfile` and `JobRequisition`, owning the `InterviewSession` and `Evaluation`.
+- `InterviewSession`: Real-time chat transcript history and token metrics.
+- `Evaluation`: AI-generated matchScore, domainScore, implicitBehaviorScore, green/red flags, and human follow-up probes.
