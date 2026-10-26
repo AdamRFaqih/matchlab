@@ -19,6 +19,7 @@ enum OrgRole {
 }
 
 enum PlanTier {
+  FREE
   PAY_PER_OPREC
   SME_PRO
 }
@@ -32,20 +33,72 @@ enum ApplicationStatus {
   REJECTED
 }
 
+enum AuthTokenType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  FAILED
+  EXPIRED
+  CANCELED
+  REFUNDED
+}
+
 model User {
-  id               String              @id @default(cuid())
+  id               String                   @id @default(cuid())
   name             String
-  email            String              @unique
+  email            String                   @unique
   passwordHash     String
-  systemRole       SystemRole          @default(JOB_SEEKER)
-  isActive         Boolean             @default(true)
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  systemRole       SystemRole               @default(JOB_SEEKER)
+  isActive         Boolean                  @default(true)
+  emailVerifiedAt  DateTime?
+  lastLoginAt      DateTime?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
   memberships      OrganizationMember[]
   candidateProfile CandidateProfile?
+  sessions         Session[]
+  authTokens       AuthToken[]
+  sentInvitations  OrganizationInvitation[] @relation("InvitedBy")
+  invoices         Invoice[]                @relation("InvoiceCreatedBy")
+  auditLogs        AuditLog[]               @relation("AuditActor")
 
   @@index([email])
   @@index([systemRole])
+}
+
+/// Server-side session. The cookie holds a random token; only its SHA-256 hash is stored.
+model Session {
+  id          String   @id @default(cuid())
+  tokenHash   String   @unique
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeOrgId String?
+  userAgent   String?
+  ipAddress   String?
+  expiresAt   DateTime
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Single-use tokens for email verification & password reset (hash stored only).
+model AuthToken {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      AuthTokenType
+  tokenHash String        @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime      @default(now())
+
+  @@index([userId, type])
 }
 
 model OrganizationMember {
@@ -63,18 +116,46 @@ model OrganizationMember {
   @@index([userId])
 }
 
+model OrganizationInvitation {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  orgRole        OrgRole      @default(DIVISION_LEAD)
+  tokenHash      String       @unique
+  invitedById    String?
+  invitedBy      User?        @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([email])
+}
+
 model Organization {
-  id                 String               @id @default(cuid())
+  id                 String                   @id @default(cuid())
   name               String
-  slug               String               @unique
-  planTier           PlanTier             @default(PAY_PER_OPREC)
-  applicantQuota     Int                  @default(100)
-  cultureDescription String?              @db.Text
-  isVerified         Boolean              @default(false)
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
+  slug               String                   @unique
+  planTier           PlanTier                 @default(FREE)
+  /// Applicant allowance for the current billing period (FREE/SME_PRO) or purchased credits (PAY_PER_OPREC).
+  applicantQuota     Int                      @default(20)
+  /// Applicants consumed against `applicantQuota`. Incremented atomically on every new application.
+  applicantsUsed     Int                      @default(0)
+  /// End of the paid SME_PRO period. When it passes, the org falls back to FREE limits.
+  currentPeriodEnd   DateTime?
+  billingEmail       String?
+  cultureDescription String?                  @db.Text
+  isVerified         Boolean                  @default(false)
+  isSuspended        Boolean                  @default(false)
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
   members            OrganizationMember[]
   jobs               JobRequisition[]
+  invitations        OrganizationInvitation[]
+  invoices           Invoice[]
+  auditLogs          AuditLog[]
 }
 
 model CandidateProfile {
@@ -155,4 +236,52 @@ model Evaluation {
   createdAt             DateTime       @default(now())
 
   @@index([matchScore(sort: Desc)])
+}
+
+/// Midtrans payment / invoice record. `orderId` is the Midtrans order_id.
+model Invoice {
+  id                    String        @id @default(cuid())
+  organizationId        String
+  organization          Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdById           String?
+  createdBy             User?         @relation("InvoiceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  orderId               String        @unique
+  plan                  PlanTier
+  description           String
+  amount                Int // IDR, integer rupiah
+  quotaGranted          Int
+  periodDays            Int? // For subscription plans (SME_PRO)
+  status                InvoiceStatus @default(PENDING)
+  snapToken             String?
+  snapRedirectUrl       String?
+  paymentType           String?
+  midtransTransactionId String?
+  rawNotification       Json?
+  paidAt                DateTime?
+  fulfilledAt           DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  @@index([organizationId, createdAt])
+  @@index([status])
+}
+
+model AuditLog {
+  id             String        @id @default(cuid())
+  actorId        String?
+  actor          User?         @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorEmail     String?
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  action         String
+  targetType     String?
+  targetId       String?
+  metadata       Json?
+  ipAddress      String?
+  createdAt      DateTime      @default(now())
+
+  @@index([createdAt])
+  @@index([organizationId, createdAt])
+  @@index([actorId])
+  @@index([action])
 }
