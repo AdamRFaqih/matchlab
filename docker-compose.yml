@@ -1,0 +1,62 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: matchlab-db
+    restart: unless-stopped
+    command: >
+      postgres
+      -c shared_buffers=64MB
+      -c effective_cache_size=192MB
+      -c work_mem=4MB
+      -c max_connections=50
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-matchlab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-matchlab_prod}
+    ports:
+      # Bound to localhost:5435 so you (and Orca during dev) can run `npx prisma migrate dev`
+      # without colliding with appsoc-db-postgres-1 on 5432!
+      - "127.0.0.1:5435:5432"
+    volumes:
+      - matchlab_pgdata:/var/lib/postgresql/data
+    networks:
+      - matchlab-net
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-matchlab} -d ${POSTGRES_DB:-matchlab_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: matchlab-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      # Bound to 3005 to avoid open-webui (3000), appsoc (3001), and grafana (3002)
+      - "3005:3000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-matchlab}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-matchlab_prod}?schema=public
+      AI_PROVIDER_API_KEY: ${AI_PROVIDER_API_KEY}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://matchlab.yourdomain.id}
+    networks:
+      - matchlab-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+volumes:
+  matchlab_pgdata:
+
+networks:
+  matchlab-net:
+    driver: bridge
