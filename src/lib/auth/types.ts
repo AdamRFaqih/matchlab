@@ -66,6 +66,18 @@ export const DEMO_ROLES = [
     email: "fajar@example.com",
     systemRole: "JOB_SEEKER" as SystemRole,
   },
+  {
+    label: "Job Seeker (Bagas Pratama)",
+    description: "Staff SRE Candidate (Shortlisted)",
+    email: "bagas@example.com",
+    systemRole: "JOB_SEEKER" as SystemRole,
+  },
+  {
+    label: "Job Seeker (Aisyah Putri)",
+    description: "Frontend & UX Specialist Candidate",
+    email: "aisyah@example.com",
+    systemRole: "JOB_SEEKER" as SystemRole,
+  },
 ] as const;
 
 export const DEFAULT_SUPER_ADMIN_MOCK: AuthUser = {
