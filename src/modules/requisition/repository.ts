@@ -106,7 +106,7 @@ export async function listJobRequisitions(organizationId?: string) {
     orderBy: { createdAt: "desc" },
     include: {
       _count: {
-        select: { candidates: true },
+        select: { applications: true },
       },
     },
   });

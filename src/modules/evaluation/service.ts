@@ -39,7 +39,7 @@ export async function evaluateCandidateTranscript(
     return { success: false, error: "Kandidat tidak ditemukan." };
   }
 
-  const { job, session } = candidateRecord;
+  const { job, session, candidateProfile } = candidateRecord;
   if (!session) {
     return { success: false, error: "Sesi wawancara kandidat belum dimulai." };
   }
@@ -57,9 +57,10 @@ export async function evaluateCandidateTranscript(
     const rawEvaluation = await evaluateTranscriptWithAi({
       jobTitle: job.title,
       rubric,
-      candidateName: candidateRecord.fullName,
-      cvSummary: candidateRecord.cvSummaryText,
+      candidateName: candidateProfile.user.name,
+      cvSummary: candidateProfile.cvSummaryText,
       messages: messagesForAi,
+      cultureDescription: job.organization.cultureDescription || undefined,
     });
 
     const validatedEval = CandidateEvaluationSchema.parse(rawEvaluation);
@@ -87,7 +88,7 @@ export async function getJobLeaderboardData(
 
   const rubric = ScoringRubricSchema.parse(job.scoringRubric);
 
-  const candidates: LeaderboardCandidate[] = job.candidates.map((c) => {
+  const candidates: LeaderboardCandidate[] = job.applications.map((c) => {
     let evaluation: CandidateEvaluation | null = null;
 
     if (c.evaluation) {
@@ -105,10 +106,10 @@ export async function getJobLeaderboardData(
 
     return {
       id: c.id,
-      fullName: c.fullName,
-      email: c.email,
-      cvSummaryText: c.cvSummaryText,
-      portfolioUrl: c.portfolioUrl,
+      fullName: c.candidateProfile.user.name,
+      email: c.candidateProfile.user.email,
+      cvSummaryText: c.candidateProfile.cvSummaryText,
+      portfolioUrl: c.candidateProfile.portfolioUrl,
       status: c.status,
       createdAt: c.createdAt,
       turnCount: c.session?.turnCount ?? 0,

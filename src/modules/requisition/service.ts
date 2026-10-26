@@ -1,3 +1,4 @@
+import { db } from "@/lib/db";
 import { translateRequirementsWithAi } from "@/lib/ai/translator";
 import {
   CreateJobRequisitionInputSchema,
@@ -14,7 +15,8 @@ import type {
 } from "./types";
 
 export async function translateRequirements(
-  rawPrompt: string
+  rawPrompt: string,
+  organizationId?: string
 ): Promise<TranslateRequirementsResult> {
   const trimmed = rawPrompt.trim();
   if (trimmed.length < 10) {
@@ -24,8 +26,21 @@ export async function translateRequirements(
     };
   }
 
+  let cultureDescription: string | undefined;
+  if (organizationId) {
+    try {
+      const org = await db.organization.findUnique({
+        where: { id: organizationId },
+        select: { cultureDescription: true },
+      });
+      cultureDescription = org?.cultureDescription || undefined;
+    } catch (e) {
+      console.warn("Could not fetch org culture:", e);
+    }
+  }
+
   try {
-    const rawRubric = await translateRequirementsWithAi(trimmed);
+    const rawRubric = await translateRequirementsWithAi(trimmed, cultureDescription);
     const validatedRubric = ScoringRubricSchema.parse(rawRubric);
 
     return {

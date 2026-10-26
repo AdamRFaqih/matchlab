@@ -17,9 +17,15 @@ interface ScreeningFlowProps {
       implicitWeight?: number;
     };
   };
+  initialCandidateProfile?: {
+    fullName?: string;
+    email?: string;
+    cvSummaryText?: string;
+    portfolioUrl?: string;
+  };
 }
 
-export function ScreeningFlow({ job }: ScreeningFlowProps) {
+export function ScreeningFlow({ job, initialCandidateProfile }: ScreeningFlowProps) {
   const [session, setSession] = useState<InterviewSessionData | null>(null);
 
   const storageKey = `matchlab_session_${job.slug}`;
@@ -48,7 +54,13 @@ export function ScreeningFlow({ job }: ScreeningFlowProps) {
   };
 
   if (!session) {
-    return <CandidateRegistrationForm job={job} onRegistered={handleRegistered} />;
+    return (
+      <CandidateRegistrationForm
+        job={job}
+        initialCandidateProfile={initialCandidateProfile}
+        onRegistered={handleRegistered}
+      />
+    );
   }
 
   return <ScreeningChatRoom initialSession={session} />;

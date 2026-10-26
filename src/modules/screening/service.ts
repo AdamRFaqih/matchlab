@@ -72,7 +72,7 @@ export async function registerCandidate(
       session: {
         id: existing.session.id,
         candidateId: existing.id,
-        candidateName: existing.fullName,
+        candidateName: existing.candidateProfile.user.name,
         jobTitle: job.title,
         jobSlug: job.slug,
         messages: existingMessages,
@@ -129,8 +129,11 @@ export async function sendCandidateMessage(
     return { success: false, error: "Sesi wawancara tidak ditemukan." };
   }
 
-  const candidate = sessionRecord.candidate;
-  const job = candidate.job;
+  const application = sessionRecord.application;
+  const job = application.job;
+  const candidateName = application.candidateProfile.user.name;
+  const cvSummary = application.candidateProfile.cvSummaryText;
+  const candidateId = application.id;
   const maxTurns = job.maxTurns || MAX_INTERVIEW_TURNS;
 
   // Guardrail 1: Enforce hard turn limit and completion check on server
@@ -170,8 +173,8 @@ export async function sendCandidateMessage(
   // Guardrail 3: Call AI interviewer with candidate_input XML wrapping
   const replyText = await generateInterviewReply({
     jobTitle: job.title,
-    candidateName: candidate.fullName,
-    cvSummary: candidate.cvSummaryText,
+    candidateName,
+    cvSummary,
     rubric,
     messages: messagesForAi,
     currentTurn: nextTurn,
@@ -194,7 +197,7 @@ export async function sendCandidateMessage(
 
   await recordTurnAndReply({
     sessionId: sessionRecord.id,
-    candidateId: candidate.id,
+    candidateId,
     messages: updatedMessages,
     newTurnCount: nextTurn,
     isCompleted,
@@ -204,7 +207,7 @@ export async function sendCandidateMessage(
   if (isCompleted) {
     try {
       const { evaluateCandidateTranscript } = await import("@/modules/evaluation/service");
-      await evaluateCandidateTranscript(candidate.id);
+      await evaluateCandidateTranscript(candidateId);
     } catch (evalErr) {
       console.warn("Auto-evaluation failed, can be re-evaluated from dashboard:", evalErr);
     }
@@ -212,8 +215,8 @@ export async function sendCandidateMessage(
 
   const sessionData: InterviewSessionData = {
     id: sessionRecord.id,
-    candidateId: candidate.id,
-    candidateName: candidate.fullName,
+    candidateId,
+    candidateName,
     jobTitle: job.title,
     jobSlug: job.slug,
     messages: updatedMessages,
@@ -238,20 +241,21 @@ export async function getSessionData(
   const sessionRecord = await getSessionWithDetails(sessionId);
   if (!sessionRecord) return null;
 
-  const candidate = sessionRecord.candidate;
-  const job = candidate.job;
+  const application = sessionRecord.application;
+  const job = application.job;
+  const candidateName = application.candidateProfile.user.name;
   const maxTurns = job.maxTurns || MAX_INTERVIEW_TURNS;
 
   return {
     id: sessionRecord.id,
-    candidateId: candidate.id,
-    candidateName: candidate.fullName,
+    candidateId: application.id,
+    candidateName,
     jobTitle: job.title,
     jobSlug: job.slug,
     messages: parseMessages(sessionRecord.messages),
     turnCount: sessionRecord.turnCount,
     maxTurns,
     isCompleted: sessionRecord.completedAt !== null || sessionRecord.turnCount >= maxTurns,
-    status: candidate.status,
+    status: application.status,
   };
 }

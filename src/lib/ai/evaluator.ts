@@ -29,6 +29,7 @@ export interface EvaluateTranscriptParams {
   candidateName: string;
   cvSummary: string;
   messages: ChatMessageItem[];
+  cultureDescription?: string;
 }
 
 function generateFallbackEvaluation(params: EvaluateTranscriptParams): CandidateEvaluation {
@@ -95,18 +96,22 @@ export async function evaluateTranscriptWithAi(
     return generateFallbackEvaluation(params);
   }
 
-  const { jobTitle, rubric, candidateName, cvSummary, messages } = params;
+  const { jobTitle, rubric, candidateName, cvSummary, messages, cultureDescription } = params;
 
   const formattedTranscript = messages
     .map((m, idx) => `[Turn ${Math.floor(idx / 2) + 1}] ${m.role === "assistant" ? "AI Interviewer" : candidateName}: ${m.content}`)
     .join("\n\n");
+
+  const cultureSection = cultureDescription?.trim()
+    ? `\nNILAI & BUDAYA PERUSAHAAN (Culture DNA):\n"""\n${cultureDescription.trim()}\n"""\n`
+    : "";
 
   const prompt = `
 Berikut adalah data posisi, rubrik evaluasi, dan transkrip wawancara lengkap:
 
 POSISI: ${jobTitle}
 RINGKASAN CV KANDIDAT: ${cvSummary}
-
+${cultureSection}
 SCORING RUBRIC:
 - Bobot Teknis: ${rubric.domainWeight}%
 - Bobot Karakter/Implicit: ${rubric.implicitWeight}%

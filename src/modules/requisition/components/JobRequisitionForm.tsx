@@ -53,7 +53,15 @@ const SAMPLE_PROMPTS = [
   },
 ];
 
-export function JobRequisitionForm() {
+interface JobRequisitionFormProps {
+  organizationId?: string;
+  organizationName?: string;
+}
+
+export function JobRequisitionForm({
+  organizationId,
+  organizationName,
+}: JobRequisitionFormProps = {}) {
   const [title, setTitle] = useState("");
   const [rawPrompt, setRawPrompt] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
@@ -78,7 +86,7 @@ export function JobRequisitionForm() {
     setIsTranslating(true);
 
     try {
-      const res = await translateRequirementsAction(rawPrompt);
+      const res = await translateRequirementsAction(rawPrompt, organizationId);
       if (res.success && res.rubric) {
         setRubric(res.rubric);
         if (!title.trim()) {
@@ -195,6 +203,7 @@ export function JobRequisitionForm() {
 
     try {
       const res = await saveJobRequisitionAction({
+        organizationId,
         title,
         rawUserPrompt: rawPrompt,
         scoringRubric: rubric,
@@ -300,10 +309,17 @@ export function JobRequisitionForm() {
         <>
           <Card>
             <CardHeader>
-              <CardTitle className="text-2xl flex items-center gap-2">
-                <Sparkles className="w-6 h-6 text-primary" />
-                AI Requirement Translator (Flow A)
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-2xl flex items-center gap-2">
+                  <Sparkles className="w-6 h-6 text-primary" />
+                  AI Requirement Translator (Flow A)
+                </CardTitle>
+                {organizationName && (
+                  <Badge variant="outline" className="text-xs">
+                    {organizationName}
+                  </Badge>
+                )}
+              </div>
               <CardDescription>
                 Tulis kebutuhan kandidat dengan bahasa Indonesia santai. AI MatchLab akan merumuskannya menjadi
                 rubrik penilaian objektif dan pertanyaan skenario untuk wawancara 8-turn.

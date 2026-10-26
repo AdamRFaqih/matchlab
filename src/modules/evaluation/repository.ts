@@ -3,16 +3,16 @@ import type { ApplicationStatus, Prisma } from "@prisma/client";
 import type { CandidateEvaluation } from "@/lib/ai/schemas";
 
 export async function saveEvaluationRecord(
-  candidateId: string,
+  applicationId: string,
   evaluation: CandidateEvaluation
 ) {
   const traitBreakdownJson = evaluation.traitBreakdown as unknown as Prisma.InputJsonValue;
 
   return await db.$transaction(async (tx) => {
     const savedEval = await tx.evaluation.upsert({
-      where: { candidateId },
+      where: { applicationId },
       create: {
-        candidateId,
+        applicationId,
         matchScore: evaluation.matchScore,
         domainScore: evaluation.domainScore,
         implicitBehaviorScore: evaluation.implicitBehaviorScore,
@@ -34,19 +34,19 @@ export async function saveEvaluationRecord(
       },
     });
 
-    // Update candidate status to EVALUATED if not already SHORTLISTED or REJECTED
-    const candidate = await tx.candidate.findUnique({
-      where: { id: candidateId },
+    // Update application status to EVALUATED if not already SHORTLISTED or REJECTED
+    const application = await tx.jobApplication.findUnique({
+      where: { id: applicationId },
       select: { status: true },
     });
 
     if (
-      candidate &&
-      candidate.status !== "SHORTLISTED" &&
-      candidate.status !== "REJECTED"
+      application &&
+      application.status !== "SHORTLISTED" &&
+      application.status !== "REJECTED"
     ) {
-      await tx.candidate.update({
-        where: { id: candidateId },
+      await tx.jobApplication.update({
+        where: { id: applicationId },
         data: { status: "EVALUATED" },
       });
     }
@@ -60,8 +60,13 @@ export async function getJobWithLeaderboard(jobId: string) {
     where: { id: jobId },
     include: {
       organization: true,
-      candidates: {
+      applications: {
         include: {
+          candidateProfile: {
+            include: {
+              user: true,
+            },
+          },
           session: true,
           evaluation: true,
         },
@@ -80,23 +85,32 @@ export async function getJobWithLeaderboard(jobId: string) {
   });
 }
 
-export async function getCandidateForEvaluation(candidateId: string) {
-  return await db.candidate.findUnique({
-    where: { id: candidateId },
+export async function getCandidateForEvaluation(applicationId: string) {
+  return await db.jobApplication.findUnique({
+    where: { id: applicationId },
     include: {
-      job: true,
+      job: {
+        include: {
+          organization: true,
+        },
+      },
       session: true,
       evaluation: true,
+      candidateProfile: {
+        include: {
+          user: true,
+        },
+      },
     },
   });
 }
 
 export async function updateCandidateApplicationStatus(
-  candidateId: string,
+  applicationId: string,
   status: ApplicationStatus
 ) {
-  return await db.candidate.update({
-    where: { id: candidateId },
+  return await db.jobApplication.update({
+    where: { id: applicationId },
     data: { status },
   });
 }

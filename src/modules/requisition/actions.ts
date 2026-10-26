@@ -11,9 +11,10 @@ import type {
 } from "./types";
 
 export async function translateRequirementsAction(
-  prompt: string
+  prompt: string,
+  organizationId?: string
 ): Promise<TranslateRequirementsResult> {
-  return await translateRequirements(prompt);
+  return await translateRequirements(prompt, organizationId);
 }
 
 export async function saveJobRequisitionAction(
