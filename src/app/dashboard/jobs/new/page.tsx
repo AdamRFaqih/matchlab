@@ -1,30 +1,34 @@
-import { JobRequisitionForm } from "@/modules/requisition/components/JobRequisitionForm";
-import { getSession } from "@/lib/auth/session";
 import type { Metadata } from "next";
+import { requireOrgMember } from "@/lib/auth/guards";
+import { db } from "@/lib/db";
+import { JobRequisitionForm } from "@/modules/requisition/components/JobRequisitionForm";
 
 export const metadata: Metadata = {
-  title: "Buat Job Requisition Baru | MatchLab",
+  title: "Buat Lowongan Baru",
   description:
     "AI-Powered Requirement Translator untuk menyusun Scoring Rubric wawancara kandidat secara otomatis.",
 };
 
 export default async function NewJobPage() {
-  const sessionUser = await getSession();
-  const activeOrgId = sessionUser?.activeOrgId || sessionUser?.memberships[0]?.organizationId;
-  const activeOrgName = sessionUser?.memberships[0]?.organizationName;
+  const ctx = await requireOrgMember();
+
+  const org = await db.organization.findUniqueOrThrow({
+    where: { id: ctx.organizationId },
+    select: { name: true },
+  });
 
   return (
     <div className="space-y-6">
       <div className="border-b pb-4">
-        <h1 className="text-3xl font-extrabold tracking-tight">Buat Job Requisition</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight">Buat Lowongan Baru</h1>
         <p className="text-muted-foreground mt-1">
-          Formula kebutuhan kandidat menjadi instrumen penyaringan AI otomatis berbasis studi kasus dan Culture DNA tim.
+          Terjemahkan kriteria kandidat menjadi instrumen wawancara AI otomatis berbasis studi kasus dan Culture DNA organisasi.
         </p>
       </div>
 
       <JobRequisitionForm
-        organizationId={activeOrgId}
-        organizationName={activeOrgName}
+        organizationId={ctx.organizationId}
+        organizationName={org.name}
       />
     </div>
   );

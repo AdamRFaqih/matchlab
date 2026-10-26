@@ -47,7 +47,6 @@ export function CandidateProfileForm({ initialProfile }: CandidateProfileFormPro
 
     startTransition(async () => {
       const res = await saveCandidateProfileAction({
-        userId: initialProfile.userId,
         name,
         cvSummaryText,
         skills: parsedSkills,

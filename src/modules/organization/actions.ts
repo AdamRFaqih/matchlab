@@ -1,22 +1,29 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { assertOrgAccess, toActionError } from "@/lib/auth/guards";
 import { updateOrganizationSettings } from "./service";
 
 export async function updateOrganizationSettingsAction(params: {
   organizationId: string;
   name: string;
-  cultureDescription: string;
+  billingEmail?: string;
+  cultureDescription?: string;
 }) {
   try {
-    if (!params.name.trim()) {
+    const ctx = await assertOrgAccess(params.organizationId, { adminOnly: true });
+
+    if (!params.name || !params.name.trim()) {
       return { success: false, error: "Nama organisasi tidak boleh kosong." };
     }
 
     await updateOrganizationSettings({
-      organizationId: params.organizationId,
+      organizationId: ctx.organizationId,
+      actorId: ctx.user.id,
+      actorEmail: ctx.user.email,
       name: params.name.trim(),
-      cultureDescription: params.cultureDescription.trim(),
+      billingEmail: params.billingEmail,
+      cultureDescription: params.cultureDescription,
     });
 
     revalidatePath("/dashboard");
@@ -25,7 +32,7 @@ export async function updateOrganizationSettingsAction(params: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Gagal memperbarui pengaturan organisasi.",
+      error: toActionError(error, "Gagal memperbarui pengaturan organisasi."),
     };
   }
 }

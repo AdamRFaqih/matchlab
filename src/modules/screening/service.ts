@@ -11,8 +11,10 @@ import {
   type ChatMessageItem,
 } from "@/lib/ai/interviewer";
 import { ScoringRubricSchema } from "@/lib/ai/schemas";
+import { evaluateCandidateTranscript } from "@/modules/evaluation/service";
+import { QuotaExceededError } from "@/lib/billing/quota";
+import { rateLimit } from "@/lib/rate-limit";
 import type {
-  CandidateRegistrationInput,
   ChatMessage,
   InterviewSessionData,
   RegisterCandidateResult,
@@ -33,17 +35,24 @@ function parseMessages(rawJson: unknown): ChatMessage[] {
 }
 
 export async function registerCandidate(
-  input: CandidateRegistrationInput
+  input: {
+    jobSlug: string;
+    fullName: string;
+    cvSummaryText: string;
+    portfolioUrl?: string;
+    clientIp?: string;
+  },
+  seeker: {
+    id: string;
+    email: string;
+    candidateProfileId: string;
+  }
 ): Promise<RegisterCandidateResult> {
   const fullName = input.fullName.trim();
-  const email = input.email.toLowerCase().trim();
   const cvSummary = input.cvSummaryText.trim();
 
   if (fullName.length < 2) {
     return { success: false, error: "Nama lengkap minimal 2 karakter." };
-  }
-  if (!email.includes("@") || !email.includes(".")) {
-    return { success: false, error: "Format alamat email tidak valid." };
   }
   if (cvSummary.length < 10) {
     return {
@@ -53,18 +62,25 @@ export async function registerCandidate(
   }
 
   const job = await findJobForScreening(input.jobSlug);
-  if (!job) {
+  if (!job || !job.isActive) {
     return {
       success: false,
-      error: "Posisi lowongan tidak ditemukan atau sudah tidak aktif.",
+      error: "Posisi lowongan tidak ditemukan atau sudah tidak menerima pendaftaran.",
+    };
+  }
+
+  if (job.organization.isSuspended) {
+    return {
+      success: false,
+      error: "Organisasi ini sedang ditangguhkan dan tidak dapat menerima pelamar baru.",
     };
   }
 
   const rubric = ScoringRubricSchema.parse(job.scoringRubric);
   const maxTurns = job.maxTurns || MAX_INTERVIEW_TURNS;
 
-  // Check if candidate already registered
-  const existing = await findCandidateWithSession(job.id, email);
+  // Check if candidate already registered for this job
+  const existing = await findCandidateWithSession(job.id, seeker.candidateProfileId);
   if (existing && existing.session) {
     const existingMessages = parseMessages(existing.session.messages);
     return {
@@ -93,163 +109,191 @@ export async function registerCandidate(
     timestamp: new Date().toISOString(),
   };
 
-  const created = await createCandidateAndSession({
-    jobId: job.id,
-    fullName,
-    email,
-    cvSummaryText: cvSummary,
-    portfolioUrl: input.portfolioUrl,
-    clientIp: input.clientIp,
-    initialMessage,
-  });
+  try {
+    const created = await createCandidateAndSession({
+      jobId: job.id,
+      organizationId: job.organization.id,
+      userId: seeker.id,
+      candidateProfileId: seeker.candidateProfileId,
+      fullName,
+      cvSummaryText: cvSummary,
+      portfolioUrl: input.portfolioUrl,
+      clientIp: input.clientIp,
+      initialMessage,
+    });
 
-  return {
-    success: true,
-    session: {
-      id: created.session.id,
-      candidateId: created.candidate.id,
-      candidateName: created.candidate.fullName,
-      jobTitle: job.title,
-      jobSlug: job.slug,
-      messages: [initialMessage],
-      turnCount: 0,
-      maxTurns,
-      isCompleted: false,
-      status: created.candidate.status,
-    },
-  };
+    return {
+      success: true,
+      session: {
+        id: created.session.id,
+        candidateId: created.candidate.id,
+        candidateName: created.candidate.fullName,
+        jobTitle: job.title,
+        jobSlug: job.slug,
+        messages: [initialMessage],
+        turnCount: 0,
+        maxTurns,
+        isCompleted: false,
+        status: created.candidate.status,
+      },
+    };
+  } catch (error) {
+    if (error instanceof QuotaExceededError) {
+      return {
+        success: false,
+        error: "Mohon maaf, kuota pelamar untuk lowongan organisasi ini telah mencapai batas maksimal.",
+      };
+    }
+    throw error;
+  }
 }
 
 export async function sendCandidateMessage(
   sessionId: string,
-  rawMessage: string
+  message: string,
+  seekerUserId: string
 ): Promise<SendMessageResult> {
+  const trimmed = message.trim();
+  if (!trimmed) {
+    return { success: false, error: "Pesan tidak boleh kosong." };
+  }
+  if (trimmed.length > MAX_MESSAGE_LENGTH) {
+    return {
+      success: false,
+      error: `Pesan melebihi batas ${MAX_MESSAGE_LENGTH} karakter. Mohon persingkat jawaban Anda.`,
+    };
+  }
+
+  // Rate limit candidate messages: max 30 per minute per candidate
+  const rLimit = rateLimit(`candidate-msg:${seekerUserId}`, 30, 60 * 1000);
+  if (!rLimit.ok) {
+    return {
+      success: false,
+      error: `Anda mengirim pesan terlalu cepat. Mohon tunggu ${rLimit.retryAfterSeconds} detik.`,
+    };
+  }
+
   const sessionRecord = await getSessionWithDetails(sessionId);
   if (!sessionRecord) {
     return { success: false, error: "Sesi wawancara tidak ditemukan." };
   }
 
-  const application = sessionRecord.application;
-  const job = application.job;
-  const candidateName = application.candidateProfile.user.name;
-  const cvSummary = application.candidateProfile.cvSummaryText;
-  const candidateId = application.id;
+  // Verification: ensure session belongs to calling seeker!
+  if (sessionRecord.application.candidateProfile.user.id !== seekerUserId) {
+    return { success: false, error: "Akses sesi wawancara ditolak." };
+  }
+
+  const { application } = sessionRecord;
+  const { job, candidateProfile } = application;
   const maxTurns = job.maxTurns || MAX_INTERVIEW_TURNS;
 
-  // Guardrail 1: Enforce hard turn limit and completion check on server
-  if (sessionRecord.completedAt !== null || sessionRecord.turnCount >= maxTurns) {
+  if (sessionRecord.completedAt || sessionRecord.turnCount >= maxTurns) {
     return {
       success: false,
-      error: `Sesi wawancara telah mencapai batas maksimal (${maxTurns} giliran) dan telah selesai.`,
-      isCompleted: true,
+      error: "Sesi wawancara sudah selesai. Jawaban tidak dapat ditambahkan lagi.",
     };
   }
 
-  // Guardrail 2: Input sanitization & character length limit
-  const sanitizedContent = rawMessage.trim().slice(0, MAX_MESSAGE_LENGTH);
-  if (sanitizedContent.length === 0) {
-    return { success: false, error: "Pesan tidak boleh kosong." };
-  }
+  const rubric = ScoringRubricSchema.parse(job.scoringRubric);
+  const existingMessages = parseMessages(sessionRecord.messages);
 
-  const currentMessages = parseMessages(sessionRecord.messages);
-  const nextTurn = sessionRecord.turnCount + 1;
-  const isCompleted = nextTurn >= maxTurns;
-
-  const candidateMessageItem: ChatMessage = {
+  const userChatMessage: ChatMessage = {
     id: crypto.randomUUID(),
     role: "user",
-    content: sanitizedContent,
+    content: trimmed,
     timestamp: new Date().toISOString(),
   };
 
-  const rubric = ScoringRubricSchema.parse(job.scoringRubric);
+  const newTurnCount = sessionRecord.turnCount + 1;
+  const isFinalTurn = newTurnCount >= maxTurns;
 
-  const messagesForAi: ChatMessageItem[] = currentMessages.map((m) => ({
-    role: m.role,
-    content: m.content,
-    timestamp: m.timestamp,
-  }));
-
-  // Guardrail 3: Call AI interviewer with candidate_input XML wrapping
-  const replyText = await generateInterviewReply({
-    jobTitle: job.title,
-    candidateName,
-    cvSummary,
-    rubric,
-    messages: messagesForAi,
-    currentTurn: nextTurn,
-    maxTurns,
-    candidateMessage: sanitizedContent,
-  });
-
-  const assistantMessageItem: ChatMessage = {
-    id: crypto.randomUUID(),
-    role: "assistant",
-    content: replyText,
-    timestamp: new Date().toISOString(),
-  };
-
-  const updatedMessages = [
-    ...currentMessages,
-    candidateMessageItem,
-    assistantMessageItem,
+  const messagesForAi: ChatMessageItem[] = [
+    ...existingMessages.map((m) => ({
+      role: m.role,
+      content: m.content,
+      timestamp: m.timestamp,
+    })),
+    {
+      role: userChatMessage.role,
+      content: userChatMessage.content,
+      timestamp: userChatMessage.timestamp,
+    },
   ];
 
-  await recordTurnAndReply({
-    sessionId: sessionRecord.id,
-    candidateId,
-    messages: updatedMessages,
-    newTurnCount: nextTurn,
-    isCompleted,
-  });
-
-  // Flow C trigger: Automatic transcript evaluation upon completing screening
-  if (isCompleted) {
-    try {
-      const { evaluateCandidateTranscript } = await import("@/modules/evaluation/service");
-      await evaluateCandidateTranscript(candidateId);
-    } catch (evalErr) {
-      console.warn("Auto-evaluation failed, can be re-evaluated from dashboard:", evalErr);
-    }
+  let replyContent = "";
+  try {
+    replyContent = await generateInterviewReply({
+      jobTitle: job.title,
+      rubric,
+      candidateName: candidateProfile.user.name,
+      cvSummary: candidateProfile.cvSummaryText,
+      candidateMessage: trimmed,
+      messages: messagesForAi,
+      currentTurn: newTurnCount,
+      maxTurns,
+    });
+  } catch (err) {
+    console.error("AI reply generation error:", err);
+    replyContent =
+      "Terima kasih atas jawaban Anda. Sistem mencatat respons Anda dan kita akan melanjutkan ke tahap berikutnya.";
   }
 
-  const sessionData: InterviewSessionData = {
-    id: sessionRecord.id,
-    candidateId,
-    candidateName,
-    jobTitle: job.title,
-    jobSlug: job.slug,
-    messages: updatedMessages,
-    turnCount: nextTurn,
-    maxTurns,
-    isCompleted,
-    status: isCompleted ? "COMPLETED_SCREENING" : "IN_PROGRESS",
+  const assistantChatMessage: ChatMessage = {
+    id: crypto.randomUUID(),
+    role: "assistant",
+    content: replyContent,
+    timestamp: new Date().toISOString(),
   };
+
+  const updatedMessages: ChatMessage[] = [
+    ...existingMessages,
+    userChatMessage,
+    assistantChatMessage,
+  ];
+
+  await recordTurnAndReply(
+    sessionId,
+    updatedMessages as unknown as object,
+    newTurnCount,
+    isFinalTurn,
+    0
+  );
+
+  // When interview finishes (reaches max turns), trigger evaluation automatically in the background
+  if (isFinalTurn) {
+    evaluateCandidateTranscript(application.id).catch((err) => {
+      console.error("Background evaluation trigger failed:", err);
+    });
+  }
 
   return {
     success: true,
-    reply: replyText,
-    turnCount: nextTurn,
-    isCompleted,
-    session: sessionData,
+    reply: replyContent,
+    turnCount: newTurnCount,
+    isCompleted: isFinalTurn,
   };
 }
 
 export async function getSessionData(
-  sessionId: string
+  sessionId: string,
+  seekerUserId: string
 ): Promise<InterviewSessionData | null> {
   const sessionRecord = await getSessionWithDetails(sessionId);
   if (!sessionRecord) return null;
 
-  const application = sessionRecord.application;
-  const job = application.job;
-  const candidateName = application.candidateProfile.user.name;
+  // Tenant/Ownership check
+  if (sessionRecord.application.candidateProfile.user.id !== seekerUserId) {
+    return null;
+  }
+
+  const { application } = sessionRecord;
+  const { job, candidateProfile } = application;
   const maxTurns = job.maxTurns || MAX_INTERVIEW_TURNS;
 
   return {
     id: sessionRecord.id,
     candidateId: application.id,
-    candidateName,
+    candidateName: candidateProfile.user.name,
     jobTitle: job.title,
     jobSlug: job.slug,
     messages: parseMessages(sessionRecord.messages),

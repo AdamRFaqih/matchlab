@@ -164,6 +164,7 @@ export async function logoutAction(): Promise<void> {
 /* ----------------------------------------------------------------------------------------- */
 
 export async function resendVerificationAction(_prev: FormState): Promise<FormState> {
+  void _prev;
   try {
     const user = await assertUser();
     if (user.emailVerified) return { message: "Email Anda sudah terverifikasi." };
