@@ -15,7 +15,7 @@ MatchLab is a self-hosted AI-Powered Two-Way Talent Matchmaker & Early Screening
 - **Framework:** Next.js 15 (App Router, TypeScript strict mode, `output: 'standalone'`).
 - **UI:** Tailwind CSS + `shadcn/ui` + Lucide Icons.
 - **Database & ORM:** PostgreSQL 16 + Prisma ORM (`prisma/schema.prisma`).
-- **AI SDK:** Vercel AI SDK (`ai`, `@ai-sdk/google` or `@ai-sdk/openai`) with `zod` structured outputs.
+- **AI SDK:** Vercel AI SDK (`ai`, `@openrouter/ai-sdk-provider`, `@ai-sdk/google`, or `@ai-sdk/openai`) with `zod` structured outputs.
 - **Directory Structure:**
   - `src/app/` -> App Router pages, layouts, and thin API/Server Action handlers.
   - `src/modules/requisition/` -> Flow A: AI Requirement Translator service, repository, and UI components.

@@ -124,7 +124,7 @@ function generateFallbackRubric(rawPrompt: string): ScoringRubric {
 }
 
 export async function translateRequirementsWithAi(rawPrompt: string): Promise<ScoringRubric> {
-  const model = getAiModel("AI_PROVIDER_API_KEY");
+  const model = getAiModel("AI_MODEL_TRANSLATOR", "gemini-2.5-flash");
 
   if (!model) {
     return generateFallbackRubric(rawPrompt);
