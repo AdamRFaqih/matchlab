@@ -4,6 +4,8 @@ import { CheckCircle2, XCircle, Sparkles, ArrowRight } from "lucide-react";
 import { verifyEmailToken } from "@/modules/auth/service";
 import { buttonVariants } from "@/components/ui/button";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Konfirmasi Verifikasi Email",
 };

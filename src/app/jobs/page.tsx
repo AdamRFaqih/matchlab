@@ -4,6 +4,8 @@ import { PublicJobBoardView } from "@/modules/job-board/components/PublicJobBoar
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Bursa Lowongan Kerja",
   description:
