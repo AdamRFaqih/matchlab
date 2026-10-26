@@ -24,6 +24,24 @@ export const ScoringRubricSchema = z.object({
 
 export type ScoringRubric = z.infer<typeof ScoringRubricSchema>;
 
+export const JobSpecSchema = z.object({
+    title: z.string().min(2),
+    roleSummary: z.string(),
+    targetAudience: z.string().optional(),
+});
+
+export type JobSpec = z.infer<typeof JobSpecSchema>;
+
+export const CreateJobRequisitionInputSchema = z.object({
+    title: z.string().min(3, "Title must be at least 3 characters"),
+    slug: z.string().optional(),
+    rawUserPrompt: z.string().min(10, "Requirement description must be at least 10 characters"),
+    organizationId: z.string().optional(),
+    scoringRubric: ScoringRubricSchema,
+    maxTurns: z.number().int().min(4).max(12).default(8),
+});
+
+export type CreateJobRequisitionInput = z.infer<typeof CreateJobRequisitionInputSchema>;
 // 2. Output of the AI Matchmaking Evaluator (Flow C)
 export const CandidateEvaluationSchema = z.object({
     domainScore: z.number().min(0).max(100),
