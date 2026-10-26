@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PlanTier {
+  PAY_PER_OPREC
+  SME_PRO
+}
+
+enum ApplicationStatus {
+  REGISTERED
+  IN_PROGRESS
+  COMPLETED_SCREENING
+  EVALUATED
+  SHORTLISTED
+  REJECTED
+}
+
+model Organization {
+  id          String           @id @default(cuid())
+  name        String
+  slug        String           @unique
+  planTier    PlanTier         @default(PAY_PER_OPREC)
+  applicantQuota Int           @default(100)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  jobs        JobRequisition[]
+}
+
+model JobRequisition {
+  id              String        @id @default(cuid())
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title           String
+  slug            String        @unique
+  rawUserPrompt   String        @db.Text
+  generatedSpec   Json          // Validated by JobSpecSchema
+  scoringRubric   Json          // Validated by ScoringRubricSchema
+  maxTurns        Int           @default(8)
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  candidates      Candidate[]
+
+  @@index([organizationId])
+}
+
+model Candidate {
+  id              String             @id @default(cuid())
+  jobId           String
+  job             JobRequisition     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  fullName        String
+  email           String
+  cvSummaryText   String             @db.Text
+  portfolioUrl    String?
+  status          ApplicationStatus  @default(REGISTERED)
+  clientIp        String?            // Captured from cf-connecting-ip
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  session         InterviewSession?
+  evaluation      Evaluation?
+
+  @@unique([jobId, email])
+  @@index([jobId, status])
+}
+
+model InterviewSession {
+  id              String    @id @default(cuid())
+  candidateId     String    @unique
+  candidate       Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  messages        Json      @default("[]") // Array of { role: 'user'|'assistant', content: string, timestamp: string }
+  turnCount       Int       @default(0)
+  totalTokensUsed Int       @default(0)
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+}
+
+model Evaluation {
+  id                    String    @id @default(cuid())
+  candidateId           String    @unique
+  candidate             Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  matchScore            Int       // 0 - 100 weighted composite
+  domainScore           Int       // 0 - 100
+  implicitBehaviorScore Int       // 0 - 100
+  executiveSummary      String    @db.Text
+  traitBreakdown        Json      // Detailed scoring per rubric item
+  greenFlags            String[]
+  redFlags              String[]
+  finalInterviewProbes  String[]  // Suggested questions for human HR/Lead
+  evalTokensUsed        Int       @default(0)
+  createdAt             DateTime  @default(now())
+
+  @@index([matchScore(sort: Desc)])
+}
