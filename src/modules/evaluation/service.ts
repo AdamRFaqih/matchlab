@@ -60,6 +60,7 @@ export async function evaluateCandidateTranscript(
       candidateName: candidateProfile.user.name,
       cvSummary: candidateProfile.cvSummaryText,
       messages: messagesForAi,
+      cultureDescription: job.organization.cultureDescription || undefined,
     });
 
     const validatedEval = CandidateEvaluationSchema.parse(rawEvaluation);

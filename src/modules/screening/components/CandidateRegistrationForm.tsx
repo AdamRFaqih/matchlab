@@ -30,17 +30,28 @@ interface CandidateRegistrationFormProps {
       implicitWeight?: number;
     };
   };
+  initialCandidateProfile?: {
+    fullName?: string;
+    email?: string;
+    cvSummaryText?: string;
+    portfolioUrl?: string;
+  };
   onRegistered: (session: InterviewSessionData) => void;
 }
 
 export function CandidateRegistrationForm({
   job,
+  initialCandidateProfile,
   onRegistered,
 }: CandidateRegistrationFormProps) {
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [cvSummaryText, setCvSummaryText] = useState("");
-  const [portfolioUrl, setPortfolioUrl] = useState("");
+  const [fullName, setFullName] = useState(initialCandidateProfile?.fullName || "");
+  const [email, setEmail] = useState(initialCandidateProfile?.email || "");
+  const [cvSummaryText, setCvSummaryText] = useState(
+    initialCandidateProfile?.cvSummaryText || ""
+  );
+  const [portfolioUrl, setPortfolioUrl] = useState(
+    initialCandidateProfile?.portfolioUrl || ""
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 

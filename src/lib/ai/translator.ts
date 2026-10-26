@@ -123,22 +123,30 @@ function generateFallbackRubric(rawPrompt: string): ScoringRubric {
   };
 }
 
-export async function translateRequirementsWithAi(rawPrompt: string): Promise<ScoringRubric> {
+export async function translateRequirementsWithAi(
+  rawPrompt: string,
+  cultureDescription?: string
+): Promise<ScoringRubric> {
   const model = getAiModel("AI_MODEL_TRANSLATOR", "gemini-2.5-flash");
 
   if (!model) {
     return generateFallbackRubric(rawPrompt);
   }
 
+  const cultureContext = cultureDescription?.trim()
+    ? `\n\nNILAI DAN BUDAYA ORGANISASI / PERUSAHAAN (Culture DNA):\n"""\n${cultureDescription.trim()}\n"""\nPastikan kriteria implicit dan dilema situasional selaras dengan nilai dan budaya kerja di atas.`
+    : "";
+
   try {
     const result = await generateObject({
       model,
       schema: ScoringRubricSchema,
       system: TRANSLATOR_SYSTEM_PROMPT,
-      prompt: `Berikut adalah kebutuhan rekruitmen dari Lab Lead dalam bahasa Indonesia sehari-hari:
+      prompt: `Berikut adalah kebutuhan rekruitmen dari Lab Lead / Manajer dalam bahasa Indonesia sehari-hari:
 """
 ${rawPrompt}
-"""
+"""${cultureContext}
+
 Terjemahkan kebutuhan ini menjadi ScoringRubric yang komprehensif, terstruktur, dan siap pakai untuk sesi interview kandidat.`,
     });
 

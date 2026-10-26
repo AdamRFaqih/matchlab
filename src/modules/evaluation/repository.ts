@@ -89,7 +89,11 @@ export async function getCandidateForEvaluation(applicationId: string) {
   return await db.jobApplication.findUnique({
     where: { id: applicationId },
     include: {
-      job: true,
+      job: {
+        include: {
+          organization: true,
+        },
+      },
       session: true,
       evaluation: true,
       candidateProfile: {

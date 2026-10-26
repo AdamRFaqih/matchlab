@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { findJobForScreening } from "@/modules/screening/repository";
 import { ScreeningFlow } from "@/modules/screening/components/ScreeningFlow";
+import { getSession } from "@/lib/auth/session";
+import { db } from "@/lib/db";
 import type { Metadata } from "next";
 
 interface ApplyPageProps {
@@ -29,10 +31,24 @@ export async function generateMetadata({
 
 export default async function ApplyPage({ params }: ApplyPageProps) {
   const { slug } = await params;
-  const job = await findJobForScreening(slug);
+  const [job, currentUser] = await Promise.all([
+    findJobForScreening(slug),
+    getSession(),
+  ]);
 
   if (!job) {
     notFound();
+  }
+
+  let candidateProfile = null;
+  if (currentUser && currentUser.systemRole === "JOB_SEEKER") {
+    try {
+      candidateProfile = await db.candidateProfile.findUnique({
+        where: { userId: currentUser.id },
+      });
+    } catch {
+      // Fallback if offline
+    }
   }
 
   const generatedSpec = (job.generatedSpec as {
@@ -64,6 +80,16 @@ export default async function ApplyPage({ params }: ApplyPageProps) {
             maxTurns: job.maxTurns,
             generatedSpec,
           }}
+          initialCandidateProfile={
+            currentUser?.systemRole === "JOB_SEEKER"
+              ? {
+                  fullName: currentUser.name,
+                  email: currentUser.email,
+                  cvSummaryText: candidateProfile?.cvSummaryText || "",
+                  portfolioUrl: candidateProfile?.portfolioUrl || "",
+                }
+              : undefined
+          }
         />
       </main>
     </div>
