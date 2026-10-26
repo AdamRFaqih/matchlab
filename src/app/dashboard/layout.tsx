@@ -1,11 +1,16 @@
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Shield } from "lucide-react";
+import { getSession } from "@/lib/auth/session";
+import { RoleSwitcher } from "@/components/auth/RoleSwitcher";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const sessionUser = await getSession();
+  const orgName = sessionUser?.memberships[0]?.organizationName || "ASE Research Lab";
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -24,11 +29,21 @@ export default function DashboardLayout({
               >
                 Buat Lowongan
               </Link>
+              <Link
+                href="/super-admin"
+                className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+              >
+                <Shield className="w-3.5 h-3.5" />
+                Super Admin
+              </Link>
             </nav>
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>Organisasi:</span>
-            <span className="font-semibold text-foreground">ASE Lab</span>
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Organisasi:</span>
+              <span className="font-semibold text-foreground">{orgName}</span>
+            </div>
+            <RoleSwitcher currentUser={sessionUser} />
           </div>
         </div>
       </header>

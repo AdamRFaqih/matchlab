@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
 import type { ChatMessage } from "./types";
+import crypto from "node:crypto";
 
 export async function findJobForScreening(slug: string) {
   return await db.jobRequisition.findUnique({
@@ -12,16 +13,30 @@ export async function findJobForScreening(slug: string) {
 }
 
 export async function findCandidateWithSession(jobId: string, email: string) {
-  return await db.candidate.findUnique({
+  const user = await db.user.findUnique({
+    where: { email: email.toLowerCase().trim() },
+    include: {
+      candidateProfile: true,
+    },
+  });
+
+  if (!user || !user.candidateProfile) return null;
+
+  return await db.jobApplication.findUnique({
     where: {
-      jobId_email: {
+      jobId_candidateProfileId: {
         jobId,
-        email: email.toLowerCase().trim(),
+        candidateProfileId: user.candidateProfile.id,
       },
     },
     include: {
       session: true,
       job: true,
+      candidateProfile: {
+        include: {
+          user: true,
+        },
+      },
     },
   });
 }
@@ -46,30 +61,105 @@ export async function createCandidateAndSession(params: CreateCandidateParams) {
     },
   ];
 
+  const email = params.email.toLowerCase().trim();
+  const fullName = params.fullName.trim();
+
   return await db.$transaction(async (tx) => {
-    const candidate = await tx.candidate.create({
-      data: {
+    // 1. Get or create User
+    let user = await tx.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      const defaultHash = crypto.createHash("sha256").update(email + "matchlab").digest("hex");
+      user = await tx.user.create({
+        data: {
+          name: fullName,
+          email,
+          passwordHash: defaultHash,
+          systemRole: "JOB_SEEKER",
+          isActive: true,
+        },
+      });
+    }
+
+    // 2. Get or create CandidateProfile
+    let profile = await tx.candidateProfile.findUnique({
+      where: { userId: user.id },
+    });
+
+    if (!profile) {
+      profile = await tx.candidateProfile.create({
+        data: {
+          userId: user.id,
+          cvSummaryText: params.cvSummaryText.trim(),
+          portfolioUrl: params.portfolioUrl?.trim() || null,
+          isOpenToPool: true,
+        },
+      });
+    } else {
+      profile = await tx.candidateProfile.update({
+        where: { id: profile.id },
+        data: {
+          cvSummaryText: params.cvSummaryText.trim(),
+          portfolioUrl: params.portfolioUrl?.trim() || profile.portfolioUrl,
+        },
+      });
+    }
+
+    // 3. Create or update JobApplication
+    const application = await tx.jobApplication.upsert({
+      where: {
+        jobId_candidateProfileId: {
+          jobId: params.jobId,
+          candidateProfileId: profile.id,
+        },
+      },
+      create: {
         jobId: params.jobId,
-        fullName: params.fullName.trim(),
-        email: params.email.toLowerCase().trim(),
-        cvSummaryText: params.cvSummaryText.trim(),
-        portfolioUrl: params.portfolioUrl?.trim() || null,
-        clientIp: params.clientIp || null,
+        candidateProfileId: profile.id,
         status: "IN_PROGRESS",
+        clientIp: params.clientIp || null,
+      },
+      update: {
+        status: "IN_PROGRESS",
+        clientIp: params.clientIp || null,
       },
     });
 
-    const session = await tx.interviewSession.create({
-      data: {
-        candidateId: candidate.id,
-        messages: initialMessagesJson,
-        turnCount: 0,
-        startedAt: new Date(),
-      },
+    // 4. Create or update InterviewSession
+    const existingSession = await tx.interviewSession.findUnique({
+      where: { applicationId: application.id },
     });
+
+    const session = existingSession
+      ? await tx.interviewSession.update({
+          where: { applicationId: application.id },
+          data: {
+            messages: initialMessagesJson,
+            turnCount: 0,
+            startedAt: new Date(),
+            completedAt: null,
+          },
+        })
+      : await tx.interviewSession.create({
+          data: {
+            applicationId: application.id,
+            messages: initialMessagesJson,
+            turnCount: 0,
+            startedAt: new Date(),
+          },
+        });
 
     return {
-      candidate,
+      candidate: {
+        id: application.id,
+        fullName: user.name,
+        email: user.email,
+        cvSummaryText: profile.cvSummaryText,
+        portfolioUrl: profile.portfolioUrl,
+        status: application.status,
+      },
       session,
     };
   });
@@ -79,9 +169,14 @@ export async function getSessionWithDetails(sessionId: string) {
   return await db.interviewSession.findUnique({
     where: { id: sessionId },
     include: {
-      candidate: {
+      application: {
         include: {
           job: true,
+          candidateProfile: {
+            include: {
+              user: true,
+            },
+          },
         },
       },
     },
@@ -96,23 +191,12 @@ export async function getCandidateSessionByEmail(jobSlug: string, email: string)
 
   if (!job) return null;
 
-  return await db.candidate.findUnique({
-    where: {
-      jobId_email: {
-        jobId: job.id,
-        email: email.toLowerCase().trim(),
-      },
-    },
-    include: {
-      session: true,
-      job: true,
-    },
-  });
+  return await findCandidateWithSession(job.id, email);
 }
 
 export async function recordTurnAndReply(params: {
   sessionId: string;
-  candidateId: string;
+  candidateId: string; // Corresponds to applicationId
   messages: ChatMessage[];
   newTurnCount: number;
   isCompleted: boolean;
@@ -130,7 +214,7 @@ export async function recordTurnAndReply(params: {
     });
 
     if (params.isCompleted) {
-      await tx.candidate.update({
+      await tx.jobApplication.update({
         where: { id: params.candidateId },
         data: {
           status: "COMPLETED_SCREENING",

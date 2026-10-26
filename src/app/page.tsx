@@ -18,13 +18,19 @@ export default function Home() {
           Platform penyaringan awal dua arah berbasis wawancara AI. Ubah deskripsi kebutuhan santai Lab Lead
           menjadi rubrik penilaian objektif dan uji kandidat dengan skenario situasional nyata.
         </p>
-        <div className="flex justify-center gap-4 pt-4">
+        <div className="flex flex-wrap justify-center gap-4 pt-4">
           <Link
             href="/dashboard/jobs/new"
             className={cn(buttonVariants({ size: "lg" }), "font-semibold")}
           >
             Mulai Buat Lowongan (Flow A)
             <ArrowRight className="w-4 h-4 ml-1.5" />
+          </Link>
+          <Link
+            href="/super-admin"
+            className={cn(buttonVariants({ variant: "outline", size: "lg" }), "font-semibold")}
+          >
+            Super Admin Control Panel
           </Link>
         </div>
       </main>
