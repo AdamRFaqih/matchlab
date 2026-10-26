@@ -19,8 +19,12 @@ export interface OrganizationDashboardData {
     slug: string;
     planTier: PlanTier;
     applicantQuota: number;
+    applicantsUsed: number;
+    billingEmail: string | null;
     cultureDescription: string | null;
     isVerified: boolean;
+    isSuspended: boolean;
+    currentPeriodEnd: Date | null;
   };
   jobs: OrganizationDashboardJob[];
   quota: {
@@ -28,6 +32,7 @@ export interface OrganizationDashboardData {
     total: number;
     remaining: number;
     percentage: number;
+    isExpired?: boolean;
   };
   isOrgAdmin: boolean;
 }

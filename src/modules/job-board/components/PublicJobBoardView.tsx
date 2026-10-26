@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 
 interface PublicJobBoardViewProps {
   initialData: JobBoardData;
-  currentUser: AuthUser | null;
+  currentUser?: AuthUser | null;
 }
 
 export function PublicJobBoardView({ initialData, currentUser }: PublicJobBoardViewProps) {

@@ -1,36 +1,19 @@
 import { db } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
 
-export async function getOrCreateDefaultOrganization() {
-  const existing = await db.organization.findFirst({
-    orderBy: { createdAt: "asc" },
-  });
-
-  if (existing) {
-    return existing;
-  }
-
-  return await db.organization.create({
-    data: {
-      name: "ASE Lab",
-      slug: "aselab",
-      planTier: "PAY_PER_OPREC",
-      applicantQuota: 100,
-    },
-  });
-}
-
 function slugify(text: string): string {
   return text
     .toLowerCase()
+    .normalize("NFKD")
     .replace(/[^\w\s-]/g, "")
     .trim()
     .replace(/[\s_-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60) || "job-opening";
 }
 
 export async function generateUniqueJobSlug(title: string): Promise<string> {
-  const baseSlug = slugify(title) || "job-opening";
+  const baseSlug = slugify(title);
   let slug = baseSlug;
   let counter = 1;
 
@@ -49,7 +32,7 @@ export async function generateUniqueJobSlug(title: string): Promise<string> {
 }
 
 export interface CreateRequisitionParams {
-  organizationId?: string;
+  organizationId: string;
   title: string;
   slug?: string;
   rawUserPrompt: string;
@@ -59,18 +42,11 @@ export interface CreateRequisitionParams {
 }
 
 export async function createJobRequisition(params: CreateRequisitionParams) {
-  let orgId = params.organizationId;
-
-  if (!orgId) {
-    const org = await getOrCreateDefaultOrganization();
-    orgId = org.id;
-  }
-
   const finalSlug = params.slug || (await generateUniqueJobSlug(params.title));
 
   return await db.jobRequisition.create({
     data: {
-      organizationId: orgId,
+      organizationId: params.organizationId,
       title: params.title,
       slug: finalSlug,
       rawUserPrompt: params.rawUserPrompt,
@@ -100,14 +76,27 @@ export async function getJobRequisitionById(id: string) {
   });
 }
 
-export async function listJobRequisitions(organizationId?: string) {
+export async function listJobRequisitions(organizationId: string) {
   return await db.jobRequisition.findMany({
-    where: organizationId ? { organizationId } : undefined,
+    where: { organizationId },
     orderBy: { createdAt: "desc" },
     include: {
       _count: {
         select: { applications: true },
       },
     },
+  });
+}
+
+export async function setJobActiveState(id: string, organizationId: string, isActive: boolean) {
+  return await db.jobRequisition.updateMany({
+    where: { id, organizationId },
+    data: { isActive },
+  });
+}
+
+export async function deleteJobRequisition(id: string, organizationId: string) {
+  return await db.jobRequisition.deleteMany({
+    where: { id, organizationId },
   });
 }

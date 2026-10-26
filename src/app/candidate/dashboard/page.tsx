@@ -1,21 +1,22 @@
-import { getSession } from "@/lib/auth/session";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { User, Sparkles, ArrowRight, AlertCircle } from "lucide-react";
+import { requireJobSeeker } from "@/lib/auth/guards";
 import { getCandidateDashboardData } from "@/modules/candidate/service";
 import { CandidateApplicationsList } from "@/modules/candidate/components/CandidateApplicationsList";
-import Link from "next/link";
-import { User, Sparkles, ArrowRight } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Portal Pelamar (Job Seeker) | MatchLab",
+  title: "Dashboard Pelamar",
   description: "Pantau status lamaran kerja, sesi wawancara AI, dan feedback evaluasi kompetensi.",
 };
 
 export default async function CandidateDashboardPage() {
-  const sessionUser = await getSession();
-  const userId = sessionUser?.id || "usr-dewi";
-  const data = await getCandidateDashboardData(userId);
+  const sessionUser = await requireJobSeeker("/candidate/dashboard");
+  const data = await getCandidateDashboardData(sessionUser.id);
+
+  const isProfileIncomplete = !data.profile?.cvSummaryText || data.profile.cvSummaryText.length < 10;
 
   return (
     <div className="space-y-6">
@@ -27,7 +28,7 @@ export default async function CandidateDashboardPage() {
             Portal Pencari Kerja
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            Dashboard Pelamar: {data.profile?.name || sessionUser?.name}
+            Dashboard Pelamar: {data.profile?.name || sessionUser.name}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Lacak seluruh proses wawancara AI dan perkembangan lamaran Anda di semua organisasi.
@@ -52,7 +53,24 @@ export default async function CandidateDashboardPage() {
         </div>
       </div>
 
-      {/* Applications List & Stats */}
+      {isProfileIncomplete && (
+        <div className="p-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 text-amber-900 dark:text-amber-200 text-xs flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>
+              Profil & ringkasan CV Anda belum lengkap. Lengkapi profil agar data kualifikasi Anda otomatis terisi saat melamar.
+            </span>
+          </div>
+          <Link
+            href="/candidate/profile"
+            className={cn(buttonVariants({ size: "sm", variant: "outline" }), "text-xs shrink-0 bg-background")}
+          >
+            Lengkapi Profil Sekarang →
+          </Link>
+        </div>
+      )}
+
+      {/* Main Content Area */}
       <CandidateApplicationsList
         applications={data.applications}
         stats={data.stats}

@@ -11,6 +11,7 @@ import {
   Shield,
   Layers,
   ArrowLeft,
+  Mail,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,7 @@ export function OrganizationSettingsForm({
   isOrgAdmin,
 }: OrganizationSettingsFormProps) {
   const [name, setName] = useState(organization.name);
+  const [billingEmail, setBillingEmail] = useState(organization.billingEmail || "");
   const [cultureDescription, setCultureDescription] = useState(
     organization.cultureDescription || ""
   );
@@ -58,175 +60,210 @@ export function OrganizationSettingsForm({
       const res = await updateOrganizationSettingsAction({
         organizationId: organization.id,
         name,
+        billingEmail,
         cultureDescription,
       });
 
       if (res.success) {
         setMessage({
           type: "success",
-          text: "Pengaturan organisasi & Company Culture DNA berhasil diperbarui!",
+          text: "Pengaturan organisasi berhasil disimpan ke database.",
         });
       } else {
         setMessage({
           type: "error",
-          text: res.error || "Gagal memperbarui pengaturan.",
+          text: res.error || "Terjadi kesalahan saat menyimpan pengaturan.",
         });
       }
     });
   };
 
+  const planLabel =
+    organization.planTier === "SME_PRO"
+      ? "SME Pro Plan"
+      : organization.planTier === "PAY_PER_OPREC"
+      ? "Pay-per-Oprec"
+      : "Free Starter Plan";
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-4xl">
       <div className="flex items-center justify-between">
-        <Link
-          href="/dashboard"
-          className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-xs gap-1")}
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Kembali ke Dashboard Tim
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/dashboard"
+            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "gap-1 text-muted-foreground")}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Kembali
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Pengaturan Organisasi</h1>
+            <p className="text-sm text-muted-foreground">
+              Konfigurasi identitas lab/organisasi, billing email, dan kultur evaluasi AI
+            </p>
+          </div>
+        </div>
+
+        <Badge variant={organization.isVerified ? "default" : "secondary"} className="gap-1.5 py-1">
+          <Shield className="w-3.5 h-3.5" />
+          {organization.isVerified ? "Terverifikasi" : "Belum Terverifikasi"}
+        </Badge>
       </div>
 
+      {message && (
+        <div
+          className={cn(
+            "p-3.5 rounded-lg border flex items-center gap-2.5 text-sm",
+            message.type === "success"
+              ? "bg-green-500/10 border-green-500/20 text-green-700 dark:text-green-300"
+              : "bg-destructive/10 border-destructive/20 text-destructive"
+          )}
+        >
+          {message.type === "success" ? (
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+          ) : (
+            <AlertCircle className="w-4 h-4 shrink-0" />
+          )}
+          <span>{message.text}</span>
+        </div>
+      )}
+
       <form onSubmit={handleSave} className="space-y-6">
-        <Card className="border border-border/80 shadow-xs">
-          <CardHeader className="border-b pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-xl font-bold flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-primary" />
-                  Pengaturan Organisasi & Culture DNA
-                </CardTitle>
-                <CardDescription>
-                  Kelola identitas tim dan Company Culture DNA yang menjadi rujukan AI dalam membuat rubrik dan menilai kandidat.
-                </CardDescription>
-              </div>
-              <Badge variant="outline" className="font-mono text-xs">
-                {isOrgAdmin ? "Hak Akses: Org Admin" : "Hak Akses: Division Lead (Lihat Saja)"}
-              </Badge>
-            </div>
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-primary" />
+              Identitas Organisasi
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Nama dan alamat URL publik untuk job board dan apply link organisasi Anda
+            </CardDescription>
           </CardHeader>
-
-          <CardContent className="space-y-6 pt-6">
-            {message && (
-              <div
-                className={`p-3.5 rounded-lg text-xs font-medium flex items-center gap-2 ${
-                  message.type === "success"
-                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
-                    : "bg-destructive/10 text-destructive border border-destructive/30"
-                }`}
-              >
-                {message.type === "success" ? (
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                )}
-                <span>{message.text}</span>
-              </div>
-            )}
-
-            {/* Basic Info */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="orgName" className="text-xs font-semibold">
-                  Nama Perusahaan / Organisasi
-                </Label>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="orgName">Nama Organisasi / Lab</Label>
                 <Input
                   id="orgName"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  disabled={!isOrgAdmin}
+                  disabled={!isOrgAdmin || isPending}
                   required
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="orgSlug" className="text-xs font-semibold">
-                  Slug Tenant (URL)
-                </Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="orgSlug">Slug URL Organisasi</Label>
                 <Input
                   id="orgSlug"
                   value={organization.slug}
                   disabled
-                  className="bg-muted/50 cursor-not-allowed font-mono text-xs"
+                  className="bg-muted font-mono text-xs"
                 />
+                <p className="text-[11px] text-muted-foreground">
+                  Slug bersifat permanen untuk menjaga integritas tautan pelamar.
+                </p>
               </div>
             </div>
 
-            {/* Company Culture DNA */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label
-                  htmlFor="cultureDescription"
-                  className="text-xs font-semibold flex items-center gap-1.5"
-                >
-                  <Sparkles className="w-4 h-4 text-purple-600" />
-                  Company Culture DNA (Disuntikkan ke AI)
-                </Label>
-              </div>
-              <Textarea
-                id="cultureDescription"
-                rows={5}
-                value={cultureDescription}
-                onChange={(e) => setCultureDescription(e.target.value)}
-                disabled={!isOrgAdmin}
-                placeholder="cth. Tim kami menjunjung tinggi otonomi kerja, komunikasi asinkron yang jelas, rasa memiliki masalah (ownership), dan ketenangan menghadapi insiden sistem di saat genting..."
-                className="text-sm leading-relaxed"
+            <div className="space-y-1.5">
+              <Label htmlFor="billingEmail" className="flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                Email Tagihan (Billing)
+              </Label>
+              <Input
+                id="billingEmail"
+                type="email"
+                placeholder="billing@organisasi.id"
+                value={billingEmail}
+                onChange={(e) => setBillingEmail(e.target.value)}
+                disabled={!isOrgAdmin || isPending}
               />
-              <div className="p-3 rounded-lg bg-purple-500/5 border border-purple-500/20 text-xs text-muted-foreground flex items-start gap-2">
-                <Sparkles className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-                <span>
-                  <strong>Mengapa Culture DNA penting?</strong> Deskripsi ini secara otomatis disuntikkan ke dalam prompt <em>AI Requirement Translator (Flow A)</em> dan <em>AI Matchmaker Evaluator (Flow C)</em>. AI akan menghasilkan pertanyaan skenario dan mengevaluasi respon kandidat agar selaras dengan etos kerja tim Anda.
-                </span>
-              </div>
-            </div>
-
-            {/* Subscription & Quota Card */}
-            <div className="p-4 rounded-xl border bg-muted/20 space-y-3">
-              <div className="font-semibold text-xs flex items-center gap-1.5 text-foreground">
-                <Layers className="w-4 h-4 text-primary" />
-                Informasi Paket & Kuota Pelamar
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                <div>
-                  <span className="text-muted-foreground">Paket Langganan:</span>
-                  <div className="font-bold text-foreground mt-0.5">{organization.planTier}</div>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Status Verifikasi:</span>
-                  <div className="font-bold text-emerald-600 flex items-center gap-1 mt-0.5">
-                    <Shield className="w-3.5 h-3.5" />
-                    {organization.isVerified ? "Terverifikasi" : "Pending"}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Total Kuota:</span>
-                  <div className="font-bold text-foreground font-mono mt-0.5">
-                    {quota.total} pelamar
-                  </div>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Sisa Kuota:</span>
-                  <div className="font-bold text-primary font-mono mt-0.5">
-                    {quota.remaining} pelamar
-                  </div>
-                </div>
-              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Kuitansi pembayaran Midtrans dan notifikasi invoice akan dikirim ke alamat ini.
+              </p>
             </div>
           </CardContent>
-
-          {isOrgAdmin && (
-            <CardFooter className="border-t pt-4 flex justify-end">
-              <Button type="submit" disabled={isPending} className="gap-1.5 text-xs">
-                {isPending ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Save className="w-3.5 h-3.5" />
-                )}
-                Simpan Perubahan
-              </Button>
-            </CardFooter>
-          )}
         </Card>
+
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary" />
+              Profil Kultur & Evaluasi AI
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Deskripsi nilai-nilai kerja, etos tim, atau aturan lab yang dijadikan dasar penilaian implicit behavior oleh AI Interviewer & Evaluator
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Label htmlFor="cultureDescription">Deskripsi Kultur Tim / Lab</Label>
+            <Textarea
+              id="cultureDescription"
+              rows={4}
+              value={cultureDescription}
+              onChange={(e) => setCultureDescription(e.target.value)}
+              disabled={!isOrgAdmin || isPending}
+              placeholder="Contoh: Kami mengutamakan integritas riset, transparansi status pengerjaan, inisiatif mandiri, dan tanggung jawab tinggi saat minggu sibuk..."
+              className="resize-y"
+            />
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Layers className="w-4 h-4 text-primary" />
+              Paket & Kuota Pelamar
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Informasi paket langganan dan konsumsi kuota pelamar organisasi Anda
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between text-sm py-1 border-b">
+              <span className="text-muted-foreground">Paket Aktif:</span>
+              <span className="font-semibold text-foreground">{planLabel}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm py-1 border-b">
+              <span className="text-muted-foreground">Kuota Terpakai / Total:</span>
+              <span className="font-semibold text-foreground">
+                {quota.used} / {quota.total} pelamar ({quota.percentage}%)
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-sm py-1">
+              <span className="text-muted-foreground">Sisa Kuota:</span>
+              <span className="font-semibold text-primary">{quota.remaining} pelamar</span>
+            </div>
+          </CardContent>
+          <CardFooter className="bg-muted/30 border-t pt-3 flex justify-between items-center text-xs text-muted-foreground">
+            <span>Perlu menambah kuota pelamar?</span>
+            <Link
+              href="/dashboard/billing"
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "text-xs")}
+            >
+              Kelola Paket di Halaman Billing →
+            </Link>
+          </CardFooter>
+        </Card>
+
+        {isOrgAdmin && (
+          <div className="flex justify-end pt-2">
+            <Button type="submit" disabled={isPending} className="gap-2">
+              {isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Menyimpan...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  Simpan Perubahan
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </form>
     </div>
   );

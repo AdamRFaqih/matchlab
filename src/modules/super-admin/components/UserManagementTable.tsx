@@ -192,9 +192,19 @@ export function UserManagementTable({ initialUsers }: UserManagementTableProps) 
                     <tr key={user.id} className="hover:bg-muted/20 transition-colors">
                       {/* Name & Email */}
                       <td className="py-3 px-4 align-top">
-                        <div className="font-semibold text-foreground">{user.name}</div>
+                        <div className="font-semibold text-foreground flex items-center gap-1.5">
+                          <span>{user.name}</span>
+                          {user.emailVerified && (
+                            <span className="text-[10px] text-green-600 font-medium" title="Email Terverifikasi">
+                              ✓
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs text-muted-foreground font-mono">
                           {user.email}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">
+                          Login: {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString("id-ID") : "Belum login"}
                         </div>
                       </td>
 

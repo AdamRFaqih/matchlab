@@ -1,7 +1,9 @@
 import type { SystemRole, OrgRole } from "@prisma/client";
 
-export const SESSION_COOKIE_NAME = "matchlab_session_uid";
-export const ACTIVE_ORG_COOKIE_NAME = "matchlab_active_org_id";
+/** HttpOnly cookie that carries the opaque session token. */
+export const SESSION_COOKIE_NAME = "matchlab_session";
+/** Session lifetime (sliding — refreshed when the session is used after half its lifetime). */
+export const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 
 export interface AuthMembership {
   id: string;
@@ -13,78 +15,19 @@ export interface AuthMembership {
 
 export interface AuthUser {
   id: string;
+  sessionId: string;
   name: string;
   email: string;
   systemRole: SystemRole;
   isActive: boolean;
+  emailVerified: boolean;
   candidateProfileId?: string;
   memberships: AuthMembership[];
   activeOrgId?: string;
   activeOrgRole?: OrgRole;
+  activeOrgName?: string;
 }
 
-export const DEMO_ROLES = [
-  {
-    label: "Super Admin",
-    description: "Platform Owner & Control Panel Access",
-    email: "admin@matchlab.id",
-    systemRole: "SUPER_ADMIN" as SystemRole,
-  },
-  {
-    label: "Org Admin (ASE Lab)",
-    description: "Company & Quota Admin for ASE Lab",
-    email: "hendra@aselab.id",
-    systemRole: "COMPANY_USER" as SystemRole,
-    orgRole: "ORG_ADMIN" as OrgRole,
-    orgSlug: "aselab",
-  },
-  {
-    label: "Division Lead (ASE Lab)",
-    description: "Job Creator & AI Screening Evaluator",
-    email: "budi@aselab.id",
-    systemRole: "COMPANY_USER" as SystemRole,
-    orgRole: "DIVISION_LEAD" as OrgRole,
-    orgSlug: "aselab",
-  },
-  {
-    label: "Org Admin (Nusantara Tech)",
-    description: "Admin for Nusantara Tech Startup",
-    email: "siti@nusantaratech.id",
-    systemRole: "COMPANY_USER" as SystemRole,
-    orgRole: "ORG_ADMIN" as OrgRole,
-    orgSlug: "nusantara-tech",
-  },
-  {
-    label: "Job Seeker (Dewi Lestari)",
-    description: "Senior Fullstack Engineer Candidate",
-    email: "dewi@example.com",
-    systemRole: "JOB_SEEKER" as SystemRole,
-  },
-  {
-    label: "Job Seeker (Fajar Pratama)",
-    description: "Junior AI/Backend Candidate",
-    email: "fajar@example.com",
-    systemRole: "JOB_SEEKER" as SystemRole,
-  },
-  {
-    label: "Job Seeker (Bagas Pratama)",
-    description: "Staff SRE Candidate (Shortlisted)",
-    email: "bagas@example.com",
-    systemRole: "JOB_SEEKER" as SystemRole,
-  },
-  {
-    label: "Job Seeker (Aisyah Putri)",
-    description: "Frontend & UX Specialist Candidate",
-    email: "aisyah@example.com",
-    systemRole: "JOB_SEEKER" as SystemRole,
-  },
-] as const;
-
-export const DEFAULT_SUPER_ADMIN_MOCK: AuthUser = {
-  id: "super-admin-root",
-  name: "Super Admin",
-  email: "admin@matchlab.id",
-  systemRole: "SUPER_ADMIN",
-  isActive: true,
-  memberships: [],
-};
+export type ActionResult<T = undefined> =
+  | ({ success: true } & (T extends undefined ? object : { data: T }))
+  | { success: false; error: string; fieldErrors?: Record<string, string> };

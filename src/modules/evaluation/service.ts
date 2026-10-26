@@ -31,9 +31,9 @@ function parseChatMessages(raw: unknown): ChatMessage[] {
 }
 
 export async function evaluateCandidateTranscript(
-  candidateId: string
+  applicationId: string
 ): Promise<EvaluateResult> {
-  const candidateRecord = await getCandidateForEvaluation(candidateId);
+  const candidateRecord = await getCandidateForEvaluation(applicationId);
 
   if (!candidateRecord) {
     return { success: false, error: "Kandidat tidak ditemukan." };
@@ -60,31 +60,35 @@ export async function evaluateCandidateTranscript(
       candidateName: candidateProfile.user.name,
       cvSummary: candidateProfile.cvSummaryText,
       messages: messagesForAi,
-      cultureDescription: job.organization.cultureDescription || undefined,
     });
 
-    const validatedEval = CandidateEvaluationSchema.parse(rawEvaluation);
+    const parsedEvaluation = CandidateEvaluationSchema.parse(rawEvaluation);
 
-    await saveEvaluationRecord(candidateId, validatedEval);
+    await saveEvaluationRecord(applicationId, parsedEvaluation);
 
     return {
       success: true,
-      evaluation: validatedEval,
+      evaluation: parsedEvaluation,
     };
   } catch (err) {
-    console.error("Evaluation failed for candidate", candidateId, err);
+    console.error("Evaluation failed:", err);
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Gagal mengevaluasi transkrip wawancara.",
+      error: err instanceof Error ? err.message : "Evaluasi AI gagal dieksekusi.",
     };
   }
 }
 
 export async function getJobLeaderboardData(
-  jobId: string
+  jobId: string,
+  allowedOrgId?: string
 ): Promise<JobLeaderboardData | null> {
   const job = await getJobWithLeaderboard(jobId);
   if (!job) return null;
+
+  if (allowedOrgId && job.organizationId !== allowedOrgId) {
+    return null; // Strict tenant isolation: cannot see another org's job leaderboard
+  }
 
   const rubric = ScoringRubricSchema.parse(job.scoringRubric);
 
@@ -134,15 +138,12 @@ export async function getJobLeaderboardData(
 }
 
 export async function updateCandidateStatus(
-  candidateId: string,
+  applicationId: string,
   status: ApplicationStatus
 ): Promise<UpdateStatusResult> {
   try {
-    const updated = await updateCandidateApplicationStatus(candidateId, status);
-    return {
-      success: true,
-      status: updated.status,
-    };
+    await updateCandidateApplicationStatus(applicationId, status);
+    return { success: true };
   } catch (err) {
     return {
       success: false,

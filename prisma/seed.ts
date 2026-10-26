@@ -1,5 +1,6 @@
-import { PrismaClient, PlanTier, SystemRole, OrgRole, ApplicationStatus } from "@prisma/client";
+import { PrismaClient, PlanTier, SystemRole, OrgRole, ApplicationStatus, InvoiceStatus } from "@prisma/client";
 import { hashPassword } from "../src/lib/auth/password";
+import { AuditAction } from "../src/lib/audit";
 
 const prisma = new PrismaClient();
 
@@ -9,33 +10,54 @@ async function main() {
   // ---------------------------------------------------------------------------
   // 1. Super Admin Account
   // ---------------------------------------------------------------------------
+  const superAdminEmail = process.env.SEED_SUPER_ADMIN_EMAIL || "admin@matchlab.id";
+  const superAdminPassword = process.env.SEED_SUPER_ADMIN_PASSWORD || "admin123";
+
+  if (process.env.NODE_ENV === "production" && !process.env.SEED_SUPER_ADMIN_PASSWORD) {
+    console.warn("⚠️ WARNING: Running seed in production without SEED_SUPER_ADMIN_PASSWORD set! Using default fallback password.");
+  }
+
   const superAdmin = await prisma.user.upsert({
-    where: { email: "admin@matchlab.id" },
+    where: { email: superAdminEmail },
     update: {
       name: "MatchLab Super Admin",
       systemRole: SystemRole.SUPER_ADMIN,
       isActive: true,
-      passwordHash: hashPassword("admin123"),
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(),
+      passwordHash: hashPassword(superAdminPassword),
     },
     create: {
-      email: "admin@matchlab.id",
+      email: superAdminEmail,
       name: "MatchLab Super Admin",
-      passwordHash: hashPassword("admin123"),
+      passwordHash: hashPassword(superAdminPassword),
       systemRole: SystemRole.SUPER_ADMIN,
       isActive: true,
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(),
     },
   });
   console.log(`✅ Super Admin created/updated: ${superAdmin.email}`);
 
+  const seedSampleData = process.env.SEED_SAMPLE_DATA !== "false";
+  if (!seedSampleData) {
+    console.log("ℹ️ SEED_SAMPLE_DATA=false: skipping sample organizations, jobs, candidate profiles, and invoices.");
+    return;
+  }
+
   // ---------------------------------------------------------------------------
-  // 2. Organization 1: ASE Research Lab
+  // 2. Organization 1: ASE Research Lab (SME_PRO)
   // ---------------------------------------------------------------------------
   const aseOrg = await prisma.organization.upsert({
     where: { slug: "aselab" },
     update: {
       name: "ASE Research Lab",
       planTier: PlanTier.SME_PRO,
-      applicantQuota: 250,
+      applicantQuota: 750,
+      applicantsUsed: 4,
+      billingEmail: "finance@aselab.id",
+      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      isSuspended: false,
       cultureDescription:
         "Autonomous software engineering laboratory conducting cutting-edge distributed systems and AI systems research with high rigor and team accountability.",
       isVerified: true,
@@ -44,7 +66,11 @@ async function main() {
       name: "ASE Research Lab",
       slug: "aselab",
       planTier: PlanTier.SME_PRO,
-      applicantQuota: 250,
+      applicantQuota: 750,
+      applicantsUsed: 4,
+      billingEmail: "finance@aselab.id",
+      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      isSuspended: false,
       cultureDescription:
         "Autonomous software engineering laboratory conducting cutting-edge distributed systems and AI systems research with high rigor and team accountability.",
       isVerified: true,
@@ -59,6 +85,8 @@ async function main() {
       name: "Dr. Hendra Wibowo",
       systemRole: SystemRole.COMPANY_USER,
       isActive: true,
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(Date.now() - 3600000),
       passwordHash: hashPassword("aselab123"),
     },
     create: {
@@ -67,6 +95,8 @@ async function main() {
       passwordHash: hashPassword("aselab123"),
       systemRole: SystemRole.COMPANY_USER,
       isActive: true,
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(Date.now() - 3600000),
     },
   });
 
@@ -92,6 +122,8 @@ async function main() {
       name: "Budi Santoso",
       systemRole: SystemRole.COMPANY_USER,
       isActive: true,
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(Date.now() - 7200000),
       passwordHash: hashPassword("aselab123"),
     },
     create: {
@@ -100,6 +132,8 @@ async function main() {
       passwordHash: hashPassword("aselab123"),
       systemRole: SystemRole.COMPANY_USER,
       isActive: true,
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(Date.now() - 7200000),
     },
   });
 
@@ -251,14 +285,17 @@ async function main() {
   console.log(`✅ Job Requisition created/updated: ${aseJob2.title}`);
 
   // ---------------------------------------------------------------------------
-  // 3. Organization 2: Nusantara Tech Startup
+  // 3. Organization 2: Nusantara Tech Startup (PAY_PER_OPREC)
   // ---------------------------------------------------------------------------
   const nusantaraOrg = await prisma.organization.upsert({
     where: { slug: "nusantara-tech" },
     update: {
       name: "Nusantara Tech Startup",
       planTier: PlanTier.PAY_PER_OPREC,
-      applicantQuota: 100,
+      applicantQuota: 150,
+      applicantsUsed: 2,
+      billingEmail: "billing@nusantaratech.id",
+      isSuspended: false,
       cultureDescription:
         "High-growth Southeast Asian fintech startup championing customer obsession, fast execution, and modern cloud technologies.",
       isVerified: true,
@@ -267,7 +304,10 @@ async function main() {
       name: "Nusantara Tech Startup",
       slug: "nusantara-tech",
       planTier: PlanTier.PAY_PER_OPREC,
-      applicantQuota: 100,
+      applicantQuota: 150,
+      applicantsUsed: 2,
+      billingEmail: "billing@nusantaratech.id",
+      isSuspended: false,
       cultureDescription:
         "High-growth Southeast Asian fintech startup championing customer obsession, fast execution, and modern cloud technologies.",
       isVerified: true,
@@ -282,6 +322,8 @@ async function main() {
       name: "Siti Rahma",
       systemRole: SystemRole.COMPANY_USER,
       isActive: true,
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(Date.now() - 5400000),
       passwordHash: hashPassword("nusantara123"),
     },
     create: {
@@ -290,6 +332,8 @@ async function main() {
       passwordHash: hashPassword("nusantara123"),
       systemRole: SystemRole.COMPANY_USER,
       isActive: true,
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(Date.now() - 5400000),
     },
   });
 
@@ -441,7 +485,138 @@ async function main() {
   console.log(`✅ Job Requisition created/updated: ${nusantaraJob2.title}`);
 
   // ---------------------------------------------------------------------------
-  // 4. Job Seeker 1: Dewi Lestari (Senior Fullstack & Cloud)
+  // 4. Organization 3: PT Kreasi Digital Muda (FREE Tier)
+  // ---------------------------------------------------------------------------
+  const kreasiOrg = await prisma.organization.upsert({
+    where: { slug: "kreasimuda" },
+    update: {
+      name: "PT Kreasi Digital Muda",
+      planTier: PlanTier.FREE,
+      applicantQuota: 20,
+      applicantsUsed: 0,
+      billingEmail: "halo@kreasimuda.co.id",
+      isSuspended: false,
+      cultureDescription:
+        "Studio pengembangan web dan mobile kreatif yang fokus pada solusi UMKM digital di Indonesia.",
+      isVerified: false,
+    },
+    create: {
+      name: "PT Kreasi Digital Muda",
+      slug: "kreasimuda",
+      planTier: PlanTier.FREE,
+      applicantQuota: 20,
+      applicantsUsed: 0,
+      billingEmail: "halo@kreasimuda.co.id",
+      isSuspended: false,
+      cultureDescription:
+        "Studio pengembangan web dan mobile kreatif yang fokus pada solusi UMKM digital di Indonesia.",
+      isVerified: false,
+    },
+  });
+  console.log(`✅ Organization created/updated: ${kreasiOrg.name} (${kreasiOrg.slug})`);
+
+  const kreasiAdminUser = await prisma.user.upsert({
+    where: { email: "maya@kreasimuda.co.id" },
+    update: {
+      name: "Maya Indah",
+      systemRole: SystemRole.COMPANY_USER,
+      isActive: true,
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(Date.now() - 7200000),
+      passwordHash: hashPassword("kreasi123"),
+    },
+    create: {
+      name: "Maya Indah",
+      email: "maya@kreasimuda.co.id",
+      passwordHash: hashPassword("kreasi123"),
+      systemRole: SystemRole.COMPANY_USER,
+      isActive: true,
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(Date.now() - 7200000),
+    },
+  });
+
+  await prisma.organizationMember.upsert({
+    where: {
+      userId_organizationId: {
+        userId: kreasiAdminUser.id,
+        organizationId: kreasiOrg.id,
+      },
+    },
+    update: { orgRole: OrgRole.ORG_ADMIN },
+    create: {
+      userId: kreasiAdminUser.id,
+      organizationId: kreasiOrg.id,
+      orgRole: OrgRole.ORG_ADMIN,
+    },
+  });
+
+  const kreasiJob1 = await prisma.jobRequisition.upsert({
+    where: { slug: "kreasi-junior-frontend" },
+    update: {
+      title: "Junior Frontend Web Developer",
+      organizationId: kreasiOrg.id,
+      rawUserPrompt: "Mencari developer frontend pemula yang menguasai HTML, CSS, JavaScript, dan React dasar.",
+      maxTurns: 6,
+      isActive: true,
+      generatedSpec: {
+        roleSummary: "Membangun antarmuka landing page dan website profil interaktif untuk klien UMKM.",
+        domainWeight: 60,
+        implicitWeight: 40,
+        requiredSkills: ["HTML5", "CSS3", "JavaScript", "React"],
+      },
+      scoringRubric: {
+        domainWeight: 60,
+        implicitWeight: 40,
+        domainTraits: [
+          { name: "Frontend Basics", description: "Kemampuan styling responsif dan manipulasi DOM", weight: 35 },
+          { name: "React Fundamentals", description: "Pemahaman props, state, dan lifecycle dasar", weight: 25 },
+        ],
+        implicitTraits: [
+          { name: "Willingness to Learn", description: "Antusiasme mempelajari teknologi baru dan menerima masukan", weight: 25 },
+          { name: "Team Communication", description: "Keaktifan bertanya dan berdiskusi", weight: 15 },
+        ],
+        probeScenarios: [
+          "Ceritakan project pertama yang Anda buat menggunakan React dan tantangannya.",
+          "Bagaimana cara Anda memastikan website tampil rapi di layar ponsel maupun desktop?",
+        ],
+      },
+    },
+    create: {
+      title: "Junior Frontend Web Developer",
+      slug: "kreasi-junior-frontend",
+      organizationId: kreasiOrg.id,
+      rawUserPrompt: "Mencari developer frontend pemula yang menguasai HTML, CSS, JavaScript, dan React dasar.",
+      maxTurns: 6,
+      isActive: true,
+      generatedSpec: {
+        roleSummary: "Membangun antarmuka landing page dan website profil interaktif untuk klien UMKM.",
+        domainWeight: 60,
+        implicitWeight: 40,
+        requiredSkills: ["HTML5", "CSS3", "JavaScript", "React"],
+      },
+      scoringRubric: {
+        domainWeight: 60,
+        implicitWeight: 40,
+        domainTraits: [
+          { name: "Frontend Basics", description: "Kemampuan styling responsif dan manipulasi DOM", weight: 35 },
+          { name: "React Fundamentals", description: "Pemahaman props, state, dan lifecycle dasar", weight: 25 },
+        ],
+        implicitTraits: [
+          { name: "Willingness to Learn", description: "Antusiasme mempelajari teknologi baru dan menerima masukan", weight: 25 },
+          { name: "Team Communication", description: "Keaktifan bertanya dan berdiskusi", weight: 15 },
+        ],
+        probeScenarios: [
+          "Ceritakan project pertama yang Anda buat menggunakan React dan tantangannya.",
+          "Bagaimana cara Anda memastikan website tampil rapi di layar ponsel maupun desktop?",
+        ],
+      },
+    },
+  });
+  console.log(`✅ Job Requisition created/updated: ${kreasiJob1.title}`);
+
+  // ---------------------------------------------------------------------------
+  // 5. Job Seeker 1: Dewi Lestari (Senior Fullstack & Cloud)
   // ---------------------------------------------------------------------------
   const dewiUser = await prisma.user.upsert({
     where: { email: "dewi@example.com" },
@@ -449,6 +624,8 @@ async function main() {
       name: "Dewi Lestari",
       systemRole: SystemRole.JOB_SEEKER,
       isActive: true,
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(Date.now() - 3600000),
       passwordHash: hashPassword("dewi123"),
     },
     create: {
@@ -457,6 +634,8 @@ async function main() {
       passwordHash: hashPassword("dewi123"),
       systemRole: SystemRole.JOB_SEEKER,
       isActive: true,
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(Date.now() - 3600000),
     },
   });
 
@@ -663,6 +842,8 @@ async function main() {
       name: "Fajar Pratama",
       systemRole: SystemRole.JOB_SEEKER,
       isActive: true,
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(Date.now() - 3600000),
       passwordHash: hashPassword("fajar123"),
     },
     create: {
@@ -671,6 +852,8 @@ async function main() {
       passwordHash: hashPassword("fajar123"),
       systemRole: SystemRole.JOB_SEEKER,
       isActive: true,
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(Date.now() - 3600000),
     },
   });
 
@@ -805,6 +988,8 @@ async function main() {
       name: "Bagas Pratama",
       systemRole: SystemRole.JOB_SEEKER,
       isActive: true,
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(Date.now() - 3600000),
       passwordHash: hashPassword("bagas123"),
     },
     create: {
@@ -813,6 +998,8 @@ async function main() {
       passwordHash: hashPassword("bagas123"),
       systemRole: SystemRole.JOB_SEEKER,
       isActive: true,
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(Date.now() - 3600000),
     },
   });
 
@@ -1007,6 +1194,8 @@ async function main() {
       name: "Aisyah Putri",
       systemRole: SystemRole.JOB_SEEKER,
       isActive: true,
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(Date.now() - 3600000),
       passwordHash: hashPassword("aisyah123"),
     },
     create: {
@@ -1015,6 +1204,8 @@ async function main() {
       passwordHash: hashPassword("aisyah123"),
       systemRole: SystemRole.JOB_SEEKER,
       isActive: true,
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(Date.now() - 3600000),
     },
   });
 
@@ -1128,6 +1319,8 @@ async function main() {
       name: "Rizky Ramadhan",
       systemRole: SystemRole.JOB_SEEKER,
       isActive: true,
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(Date.now() - 3600000),
       passwordHash: hashPassword("rizky123"),
     },
     create: {
@@ -1136,6 +1329,8 @@ async function main() {
       passwordHash: hashPassword("rizky123"),
       systemRole: SystemRole.JOB_SEEKER,
       isActive: true,
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(Date.now() - 3600000),
     },
   });
 
@@ -1249,6 +1444,8 @@ async function main() {
       name: "Dimas Suryo",
       systemRole: SystemRole.JOB_SEEKER,
       isActive: true,
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(Date.now() - 3600000),
       passwordHash: hashPassword("dimas123"),
     },
     create: {
@@ -1257,6 +1454,8 @@ async function main() {
       passwordHash: hashPassword("dimas123"),
       systemRole: SystemRole.JOB_SEEKER,
       isActive: true,
+      emailVerifiedAt: new Date(),
+      lastLoginAt: new Date(Date.now() - 3600000),
     },
   });
 
@@ -1295,6 +1494,167 @@ async function main() {
       status: ApplicationStatus.REGISTERED,
     },
   });
+
+  // ---------------------------------------------------------------------------
+  // 10. Sample Invoices (Midtrans billing history)
+  // ---------------------------------------------------------------------------
+  await prisma.invoice.upsert({
+    where: { orderId: "INV-ASE-20261020-001" },
+    update: {
+      status: InvoiceStatus.PAID,
+      paidAt: new Date(Date.now() - 6 * 86400000),
+      fulfilledAt: new Date(Date.now() - 6 * 86400000),
+    },
+    create: {
+      organizationId: aseOrg.id,
+      createdById: aseAdminUser.id,
+      orderId: "INV-ASE-20261020-001",
+      plan: PlanTier.SME_PRO,
+      description: "Langganan SME Pro (30 Hari) - ASE Research Lab",
+      amount: 499000,
+      quotaGranted: 750,
+      periodDays: 30,
+      status: InvoiceStatus.PAID,
+      paymentType: "qris",
+      midtransTransactionId: "mid-seed-ase-01",
+      paidAt: new Date(Date.now() - 6 * 86400000),
+      fulfilledAt: new Date(Date.now() - 6 * 86400000),
+    },
+  });
+
+  await prisma.invoice.upsert({
+    where: { orderId: "INV-NUSA-20261022-002" },
+    update: {
+      status: InvoiceStatus.PAID,
+      paidAt: new Date(Date.now() - 4 * 86400000),
+      fulfilledAt: new Date(Date.now() - 4 * 86400000),
+    },
+    create: {
+      organizationId: nusantaraOrg.id,
+      createdById: nusantaraAdminUser.id,
+      orderId: "INV-NUSA-20261022-002",
+      plan: PlanTier.PAY_PER_OPREC,
+      description: "Paket Pay-per-Oprec (150 Kuota) - Nusantara Tech Startup",
+      amount: 149000,
+      quotaGranted: 150,
+      periodDays: null,
+      status: InvoiceStatus.PAID,
+      paymentType: "bank_transfer",
+      midtransTransactionId: "mid-seed-nusa-01",
+      paidAt: new Date(Date.now() - 4 * 86400000),
+      fulfilledAt: new Date(Date.now() - 4 * 86400000),
+    },
+  });
+
+  await prisma.invoice.upsert({
+    where: { orderId: "INV-ASE-20261026-003" },
+    update: {
+      status: InvoiceStatus.PENDING,
+    },
+    create: {
+      organizationId: aseOrg.id,
+      createdById: aseAdminUser.id,
+      orderId: "INV-ASE-20261026-003",
+      plan: PlanTier.PAY_PER_OPREC,
+      description: "Top-up Kuota Tambahan (150 Pelamar) - ASE Research Lab",
+      amount: 149000,
+      quotaGranted: 150,
+      periodDays: null,
+      status: InvoiceStatus.PENDING,
+      snapToken: "snap-token-demo-seed-001",
+      snapRedirectUrl: "https://app.sandbox.midtrans.com/snap/v2/vtweb/mock",
+    },
+  });
+  console.log("✅ Sample Invoices created/updated");
+
+  // ---------------------------------------------------------------------------
+  // 11. Sample Audit Logs
+  // ---------------------------------------------------------------------------
+  // Delete existing seed audit logs to prevent duplicates on re-seed
+  await prisma.auditLog.deleteMany({
+    where: {
+      actorEmail: {
+        in: [superAdmin.email, aseAdminUser.email, aseLeadUser.email, nusantaraAdminUser.email, dewiUser.email],
+      },
+    },
+  });
+
+  const sampleAuditLogs = [
+    {
+      actorId: superAdmin.id,
+      actorEmail: superAdmin.email,
+      action: AuditAction.USER_LOGIN,
+      targetType: "user",
+      targetId: superAdmin.id,
+      metadata: { method: "password" },
+      createdAt: new Date(Date.now() - 7 * 86400000),
+    },
+    {
+      actorId: aseAdminUser.id,
+      actorEmail: aseAdminUser.email,
+      organizationId: aseOrg.id,
+      action: AuditAction.ORG_CREATED,
+      targetType: "organization",
+      targetId: aseOrg.id,
+      metadata: { name: aseOrg.name, plan: aseOrg.planTier },
+      createdAt: new Date(Date.now() - 6 * 86400000 - 3600000),
+    },
+    {
+      actorId: aseAdminUser.id,
+      actorEmail: aseAdminUser.email,
+      organizationId: aseOrg.id,
+      action: AuditAction.BILLING_PAYMENT_SUCCEEDED,
+      targetType: "invoice",
+      targetId: "INV-ASE-20261020-001",
+      metadata: { amount: 499000, plan: "SME_PRO", quotaGranted: 750 },
+      createdAt: new Date(Date.now() - 6 * 86400000),
+    },
+    {
+      actorId: aseAdminUser.id,
+      actorEmail: aseAdminUser.email,
+      organizationId: aseOrg.id,
+      action: AuditAction.MEMBER_INVITED,
+      targetType: "member",
+      metadata: { email: "budi@aselab.id", role: "DIVISION_LEAD" },
+      createdAt: new Date(Date.now() - 5 * 86400000),
+    },
+    {
+      actorId: aseLeadUser.id,
+      actorEmail: aseLeadUser.email,
+      organizationId: aseOrg.id,
+      action: AuditAction.MEMBER_JOINED,
+      targetType: "member",
+      targetId: aseLeadUser.id,
+      metadata: { role: "DIVISION_LEAD" },
+      createdAt: new Date(Date.now() - 5 * 86400000 + 1800000),
+    },
+    {
+      actorId: nusantaraAdminUser.id,
+      actorEmail: nusantaraAdminUser.email,
+      organizationId: nusantaraOrg.id,
+      action: AuditAction.BILLING_PAYMENT_SUCCEEDED,
+      targetType: "invoice",
+      targetId: "INV-NUSA-20261022-002",
+      metadata: { amount: 149000, plan: "PAY_PER_OPREC", quotaGranted: 150 },
+      createdAt: new Date(Date.now() - 4 * 86400000),
+    },
+    {
+      actorId: dewiUser.id,
+      actorEmail: dewiUser.email,
+      organizationId: aseOrg.id,
+      action: AuditAction.APPLICATION_STATUS_CHANGED,
+      targetType: "application",
+      metadata: { job: "aselab-senior-systems", newStatus: "SHORTLISTED" },
+      createdAt: new Date(Date.now() - 2 * 86400000),
+    },
+  ];
+
+  for (const log of sampleAuditLogs) {
+    await prisma.auditLog.create({
+      data: log,
+    });
+  }
+  console.log("✅ Sample Audit Logs seeded");
 
   console.log("✨ Seed completed successfully! All organizations, jobs, profiles, and applications are up to date.");
 }

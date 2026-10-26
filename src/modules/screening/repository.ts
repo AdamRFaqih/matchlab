@@ -1,50 +1,54 @@
 import { db } from "@/lib/db";
-import type { Prisma } from "@prisma/client";
+import { consumeApplicantQuota } from "@/lib/billing/quota";
+import type { ApplicationStatus, Prisma } from "@prisma/client";
 import type { ChatMessage } from "./types";
-import crypto from "node:crypto";
 
 export async function findJobForScreening(slug: string) {
   return await db.jobRequisition.findUnique({
-    where: { slug, isActive: true },
+    where: { slug },
     include: {
-      organization: true,
-    },
-  });
-}
-
-export async function findCandidateWithSession(jobId: string, email: string) {
-  const user = await db.user.findUnique({
-    where: { email: email.toLowerCase().trim() },
-    include: {
-      candidateProfile: true,
-    },
-  });
-
-  if (!user || !user.candidateProfile) return null;
-
-  return await db.jobApplication.findUnique({
-    where: {
-      jobId_candidateProfileId: {
-        jobId,
-        candidateProfileId: user.candidateProfile.id,
-      },
-    },
-    include: {
-      session: true,
-      job: true,
-      candidateProfile: {
-        include: {
-          user: true,
+      organization: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          isVerified: true,
+          isSuspended: true,
+          cultureDescription: true,
         },
       },
     },
   });
 }
 
+export async function findCandidateWithSession(
+  jobId: string,
+  candidateProfileId: string
+) {
+  return await db.jobApplication.findUnique({
+    where: {
+      jobId_candidateProfileId: {
+        jobId,
+        candidateProfileId,
+      },
+    },
+    include: {
+      candidateProfile: {
+        include: {
+          user: true,
+        },
+      },
+      session: true,
+    },
+  });
+}
+
 export interface CreateCandidateParams {
   jobId: string;
+  organizationId: string;
+  userId: string;
+  candidateProfileId: string;
   fullName: string;
-  email: string;
   cvSummaryText: string;
   portfolioUrl?: string;
   clientIp?: string;
@@ -61,50 +65,34 @@ export async function createCandidateAndSession(params: CreateCandidateParams) {
     },
   ];
 
-  const email = params.email.toLowerCase().trim();
-  const fullName = params.fullName.trim();
-
   return await db.$transaction(async (tx) => {
-    // 1. Get or create User
-    let user = await tx.user.findUnique({
-      where: { email },
+    // 1. Update user and profile details if provided
+    await tx.user.update({
+      where: { id: params.userId },
+      data: { name: params.fullName },
     });
 
-    if (!user) {
-      const defaultHash = crypto.createHash("sha256").update(email + "matchlab").digest("hex");
-      user = await tx.user.create({
-        data: {
-          name: fullName,
-          email,
-          passwordHash: defaultHash,
-          systemRole: "JOB_SEEKER",
-          isActive: true,
-        },
-      });
-    }
-
-    // 2. Get or create CandidateProfile
-    let profile = await tx.candidateProfile.findUnique({
-      where: { userId: user.id },
+    const profile = await tx.candidateProfile.update({
+      where: { id: params.candidateProfileId },
+      data: {
+        cvSummaryText: params.cvSummaryText.trim(),
+        portfolioUrl: params.portfolioUrl?.trim() || undefined,
+      },
     });
 
-    if (!profile) {
-      profile = await tx.candidateProfile.create({
-        data: {
-          userId: user.id,
-          cvSummaryText: params.cvSummaryText.trim(),
-          portfolioUrl: params.portfolioUrl?.trim() || null,
-          isOpenToPool: true,
+    // 2. Check if application already exists
+    const existingApp = await tx.jobApplication.findUnique({
+      where: {
+        jobId_candidateProfileId: {
+          jobId: params.jobId,
+          candidateProfileId: profile.id,
         },
-      });
-    } else {
-      profile = await tx.candidateProfile.update({
-        where: { id: profile.id },
-        data: {
-          cvSummaryText: params.cvSummaryText.trim(),
-          portfolioUrl: params.portfolioUrl?.trim() || profile.portfolioUrl,
-        },
-      });
+      },
+    });
+
+    if (!existingApp) {
+      // ATOMICALLY consume quota on the organization for new applicants!
+      await consumeApplicantQuota(tx, params.organizationId);
     }
 
     // 3. Create or update JobApplication
@@ -154,8 +142,7 @@ export async function createCandidateAndSession(params: CreateCandidateParams) {
     return {
       candidate: {
         id: application.id,
-        fullName: user.name,
-        email: user.email,
+        fullName: params.fullName,
         cvSummaryText: profile.cvSummaryText,
         portfolioUrl: profile.portfolioUrl,
         status: application.status,
@@ -183,45 +170,35 @@ export async function getSessionWithDetails(sessionId: string) {
   });
 }
 
-export async function getCandidateSessionByEmail(jobSlug: string, email: string) {
-  const job = await db.jobRequisition.findUnique({
-    where: { slug: jobSlug },
-    select: { id: true },
+export async function recordTurnAndReply(
+  sessionId: string,
+  updatedMessages: Prisma.InputJsonValue,
+  newTurnCount: number,
+  isCompleted: boolean,
+  tokensUsedDelta: number = 0
+) {
+  return await db.interviewSession.update({
+    where: { id: sessionId },
+    data: {
+      messages: updatedMessages,
+      turnCount: newTurnCount,
+      totalTokensUsed: { increment: tokensUsedDelta },
+      completedAt: isCompleted ? new Date() : undefined,
+      application: {
+        update: {
+          status: isCompleted ? "COMPLETED_SCREENING" : "IN_PROGRESS",
+        },
+      },
+    },
   });
-
-  if (!job) return null;
-
-  return await findCandidateWithSession(job.id, email);
 }
 
-export async function recordTurnAndReply(params: {
-  sessionId: string;
-  candidateId: string; // Corresponds to applicationId
-  messages: ChatMessage[];
-  newTurnCount: number;
-  isCompleted: boolean;
-}) {
-  const messagesJson = params.messages as unknown as Prisma.InputJsonValue;
-
-  return await db.$transaction(async (tx) => {
-    const updatedSession = await tx.interviewSession.update({
-      where: { id: params.sessionId },
-      data: {
-        messages: messagesJson,
-        turnCount: params.newTurnCount,
-        completedAt: params.isCompleted ? new Date() : undefined,
-      },
-    });
-
-    if (params.isCompleted) {
-      await tx.jobApplication.update({
-        where: { id: params.candidateId },
-        data: {
-          status: "COMPLETED_SCREENING",
-        },
-      });
-    }
-
-    return updatedSession;
+export async function setApplicationStatus(
+  applicationId: string,
+  status: ApplicationStatus
+) {
+  return await db.jobApplication.update({
+    where: { id: applicationId },
+    data: { status },
   });
 }

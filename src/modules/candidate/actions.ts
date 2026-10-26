@@ -1,33 +1,51 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { assertJobSeeker, toActionError } from "@/lib/auth/guards";
+import { recordAudit, AuditAction } from "@/lib/audit";
 import { saveCandidateProfile } from "./service";
 
 export async function saveCandidateProfileAction(params: {
-  userId: string;
   name: string;
   cvSummaryText: string;
   skills: string[];
   portfolioUrl?: string | null;
   isOpenToPool: boolean;
-}) {
+}): Promise<{ success: boolean; error?: string }> {
   try {
-    if (!params.name.trim()) {
+    const seeker = await assertJobSeeker();
+
+    if (!params.name || !params.name.trim()) {
       return { success: false, error: "Nama lengkap tidak boleh kosong." };
     }
-    if (params.cvSummaryText.trim().length < 10) {
+    if (!params.cvSummaryText || params.cvSummaryText.trim().length < 10) {
       return {
         success: false,
         error: "Ringkasan CV & pengalaman minimal 10 karakter.",
       };
     }
 
-    await saveCandidateProfile(params.userId, {
+    if (params.portfolioUrl && params.portfolioUrl.trim()) {
+      const url = params.portfolioUrl.trim();
+      if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        return { success: false, error: "Tautan portofolio harus diawali http:// atau https://" };
+      }
+    }
+
+    await saveCandidateProfile(seeker.id, {
       name: params.name.trim(),
       cvSummaryText: params.cvSummaryText.trim(),
       skills: params.skills,
       portfolioUrl: params.portfolioUrl?.trim() || null,
       isOpenToPool: params.isOpenToPool,
+    });
+
+    await recordAudit({
+      action: AuditAction.USER_PROFILE_UPDATED,
+      actorId: seeker.id,
+      actorEmail: seeker.email,
+      targetType: "CandidateProfile",
+      targetId: seeker.candidateProfileId,
     });
 
     revalidatePath("/candidate/profile");
@@ -36,7 +54,7 @@ export async function saveCandidateProfileAction(params: {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Gagal menyimpan profil.",
+      error: toActionError(error, "Gagal menyimpan profil."),
     };
   }
 }

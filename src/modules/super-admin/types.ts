@@ -6,6 +6,9 @@ export interface SuperAdminKpi {
   totalActiveJobs: number;
   totalTokensUsed: number;
   estimatedIdrCost: number;
+  totalRevenueIdr: number;
+  revenueThisMonthIdr: number;
+  payingOrgsCount: number;
 }
 
 export interface CompanyItem {
@@ -14,7 +17,10 @@ export interface CompanyItem {
   slug: string;
   planTier: PlanTier;
   applicantQuota: number;
+  applicantsUsed: number;
   isVerified: boolean;
+  isSuspended: boolean;
+  currentPeriodEnd: Date | null;
   cultureDescription: string | null;
   jobCount: number;
   memberCount: number;
@@ -27,6 +33,8 @@ export interface UserItem {
   email: string;
   systemRole: SystemRole;
   isActive: boolean;
+  emailVerified: boolean;
+  lastLoginAt: Date | null;
   createdAt: Date;
   organizations: Array<{
     name: string;
