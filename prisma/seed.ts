@@ -1,6 +1,56 @@
+import crypto from "node:crypto";
 import { PrismaClient, PlanTier, SystemRole, OrgRole, ApplicationStatus, InvoiceStatus } from "@prisma/client";
-import { hashPassword } from "../src/lib/auth/password";
-import { AuditAction } from "../src/lib/audit";
+
+/**
+ * Self-contained password hashing matching src/lib/auth/password.ts
+ * Uses Node.js crypto scrypt with random salt.
+ */
+const KEY_LENGTH = 32;
+const SCRYPT_N = 16384;
+
+function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto
+    .scryptSync(password, salt, KEY_LENGTH, { N: SCRYPT_N })
+    .toString("hex");
+  return `scrypt$${SCRYPT_N}$${salt}$${hash}`;
+}
+
+/**
+ * Self-contained AuditAction matching src/lib/audit.ts
+ */
+const AuditAction = {
+  USER_SIGNUP: "user.signup",
+  USER_LOGIN: "user.login",
+  USER_LOGIN_FAILED: "user.login_failed",
+  USER_LOGOUT: "user.logout",
+  USER_EMAIL_VERIFIED: "user.email_verified",
+  USER_PASSWORD_RESET_REQUESTED: "user.password_reset_requested",
+  USER_PASSWORD_RESET: "user.password_reset",
+  USER_PASSWORD_CHANGED: "user.password_changed",
+  USER_PROFILE_UPDATED: "user.profile_updated",
+  USER_DELETED: "user.deleted",
+  USER_STATUS_CHANGED: "user.status_changed",
+  ORG_CREATED: "org.created",
+  ORG_UPDATED: "org.updated",
+  ORG_VERIFIED: "org.verification_changed",
+  ORG_SUSPENDED: "org.suspension_changed",
+  ORG_PLAN_CHANGED: "org.plan_changed",
+  ORG_QUOTA_CHANGED: "org.quota_changed",
+  MEMBER_INVITED: "member.invited",
+  MEMBER_INVITE_REVOKED: "member.invite_revoked",
+  MEMBER_JOINED: "member.joined",
+  MEMBER_ROLE_CHANGED: "member.role_changed",
+  MEMBER_REMOVED: "member.removed",
+  JOB_CREATED: "job.created",
+  JOB_UPDATED: "job.updated",
+  JOB_STATUS_CHANGED: "job.status_changed",
+  JOB_DELETED: "job.deleted",
+  APPLICATION_STATUS_CHANGED: "application.status_changed",
+  BILLING_CHECKOUT_CREATED: "billing.checkout_created",
+  BILLING_PAYMENT_SUCCEEDED: "billing.payment_succeeded",
+  BILLING_PAYMENT_FAILED: "billing.payment_failed",
+} as const;
 
 const prisma = new PrismaClient();
 
