@@ -5,6 +5,8 @@ import { isPasswordResetTokenValid } from "@/modules/auth/service";
 import { ResetPasswordForm } from "@/modules/auth/components/ResetPasswordForm";
 import { buttonVariants } from "@/components/ui/button";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Password Baru",
 };

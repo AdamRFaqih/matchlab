@@ -8,6 +8,8 @@ import { normalizeEmail } from "@/modules/auth/service";
 import { buttonVariants } from "@/components/ui/button";
 import { AcceptInviteForm } from "@/modules/auth/components/AcceptInviteForm";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Undangan Bergabung ke Tim",
 };

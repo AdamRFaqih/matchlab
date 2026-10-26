@@ -17,6 +17,8 @@ import { getSession } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { buttonVariants } from "@/components/ui/button";
 
+export const dynamic = "force-dynamic";
+
 interface ApplyPageProps {
   params: Promise<{
     slug: string;
