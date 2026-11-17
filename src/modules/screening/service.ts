@@ -271,6 +271,18 @@ export async function sendCandidateMessage(
     reply: replyContent,
     turnCount: newTurnCount,
     isCompleted: isFinalTurn,
+    session: {
+      id: sessionRecord.id,
+      candidateId: application.id,
+      candidateName: candidateProfile.user.name,
+      jobTitle: job.title,
+      jobSlug: job.slug,
+      messages: updatedMessages,
+      turnCount: newTurnCount,
+      maxTurns,
+      isCompleted: isFinalTurn,
+      status: isFinalTurn ? "COMPLETED_SCREENING" : "IN_PROGRESS",
+    },
   };
 }
 

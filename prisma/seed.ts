@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { PrismaClient, PlanTier, SystemRole, OrgRole, ApplicationStatus, InvoiceStatus } from "@prisma/client";
+import { ScoringRubricSchema, CandidateEvaluationSchema } from "../src/lib/ai/schemas";
 
 /**
  * Self-contained password hashing matching src/lib/auth/password.ts
@@ -51,6 +52,292 @@ const AuditAction = {
   BILLING_PAYMENT_SUCCEEDED: "billing.payment_succeeded",
   BILLING_PAYMENT_FAILED: "billing.payment_failed",
 } as const;
+
+/**
+ * Seeded scoring rubrics. The app parses `JobRequisition.scoringRubric` with ScoringRubricSchema
+ * on every screening and evaluation, so these are validated here to fail the seed — not the
+ * runtime — if the schema changes.
+ */
+const RUBRICS = {
+  aseSeniorSystems: ScoringRubricSchema.parse({
+    roleSummary:
+      "Membangun dan memelihara infrastruktur server lab, container orchestration, dan pipeline komputasi terdistribusi.",
+    domainWeight: 50,
+    implicitWeight: 50,
+    domainCriteria: [
+      {
+        topic: "Containerization & Linux",
+        expectedDepth:
+          "Paham arsitektur Docker (namespaces, cgroups) dan mampu men-debug masalah resource di host Linux secara sistematis.",
+        probeQuestion: "Bagaimana langkah isolasi saat container menghabiskan seluruh memori host?",
+      },
+      {
+        topic: "Distributed Systems",
+        expectedDepth:
+          "Mengerti trade-off konsistensi vs ketersediaan, replikasi, dan cara mendeteksi split-brain pada KV store terdistribusi.",
+        probeQuestion:
+          "Satu node di cluster KV store Anda tertinggal replikasinya beberapa menit. Apa dampaknya ke klien dan bagaimana Anda menanganinya?",
+      },
+    ],
+    implicitCriteria: [
+      {
+        traitName: "Stress Tolerance & On-Call",
+        positiveIndicators: ["Punya prosedur triase yang runtut", "Mengkomunikasikan status insiden secara proaktif"],
+        redFlagIndicators: ["Panik atau menebak-nebak tanpa data", "Menghilang saat insiden berlangsung"],
+        situationalDilemma: "Ceritakan pengalaman ketika sistem produksi down mendadak di luar jam kerja.",
+      },
+      {
+        traitName: "Ownership",
+        positiveIndicators: ["Menuntaskan perbaikan hingga akar masalah", "Menulis post-mortem tanpa diminta"],
+        redFlagIndicators: ["Berhenti di workaround sementara", "Melempar tanggung jawab ke tim lain"],
+        situationalDilemma: "Bagaimana cara Anda menyeimbangkan kualitas kode dengan deadline riset yang ketat?",
+      },
+    ],
+  }),
+  aseAiResearcher: ScoringRubricSchema.parse({
+    roleSummary:
+      "Mendesain benchmark komputasi model AI, pipeline sintesis dataset, dan arsitektur evaluasi otomatis.",
+    domainWeight: 60,
+    implicitWeight: 40,
+    domainCriteria: [
+      {
+        topic: "AI & Model Evaluation",
+        expectedDepth:
+          "Menguasai metrik evaluasi model (MMLU, HumanEval), risiko data contamination, dan praktik fine-tuning yang sahih.",
+        probeQuestion:
+          "Bagaimana Anda mendeteksi data contamination saat mengevaluasi benchmark penalaran model bahasa?",
+      },
+      {
+        topic: "High-Throughput Pipelines",
+        expectedDepth: "Mampu mengoptimalkan throughput inferensi, batching, dan pemakaian memori GPU.",
+        probeQuestion:
+          "Bagaimana cara mengatasi CUDA Out of Memory saat training multi-GPU tanpa mengurangi batch size secara drastis?",
+      },
+    ],
+    implicitCriteria: [
+      {
+        traitName: "Research Rigor",
+        positiveIndicators: ["Mencatat log eksperimen dan seed secara konsisten", "Menjaga integritas data"],
+        redFlagIndicators: ["Hasil tidak dapat direproduksi", "Memilih metrik setelah melihat hasil"],
+        situationalDilemma:
+          "Hasil eksperimen Anda jauh lebih bagus dari baseline sehari sebelum deadline paper, tetapi Anda belum sempat mengulanginya. Apa yang Anda lakukan?",
+      },
+      {
+        traitName: "Academic Communication",
+        positiveIndicators: ["Menjelaskan metodologi dan hipotesis dengan jelas", "Terbuka terhadap kritik reviewer"],
+        redFlagIndicators: ["Menyembunyikan keterbatasan penelitian", "Penjelasan berbelit tanpa struktur"],
+        situationalDilemma:
+          "Pembimbing meminta Anda mempresentasikan hasil yang belum Anda yakini kepada sponsor riset. Bagaimana Anda menyikapinya?",
+      },
+    ],
+  }),
+  nusantaraFullstack: ScoringRubricSchema.parse({
+    roleSummary:
+      "Mengembangkan antarmuka aplikasi finansial modern, integrasi payment gateway, dan backend microservices.",
+    domainWeight: 50,
+    implicitWeight: 50,
+    domainCriteria: [
+      {
+        topic: "Frontend Mastery",
+        expectedDepth: "Penguasaan komponen reaktif Next.js (server vs client components) dan optimasi performa web.",
+        probeQuestion: "Bagaimana Anda merancang state management untuk form checkout bertingkat?",
+      },
+      {
+        topic: "API & Data Modeling",
+        expectedDepth: "Mampu mendesain RESTful API yang konsisten dan skema database relasional yang ternormalisasi.",
+        probeQuestion:
+          "Bagaimana Anda mendesain API dan skema tabel untuk riwayat transaksi yang bisa difilter dan dipaginasi dengan cepat?",
+      },
+    ],
+    implicitCriteria: [
+      {
+        traitName: "Velocity & Agility",
+        positiveIndicators: ["Merilis bertahap dengan feature flag", "Punya strategi rollback yang jelas"],
+        redFlagIndicators: ["Merilis tanpa pengujian demi kecepatan", "Kaku terhadap perubahan requirement"],
+        situationalDilemma: "Ceritakan saat Anda harus merilis hotfix di tengah traffic pengguna yang tinggi.",
+      },
+      {
+        traitName: "User Empathy",
+        positiveIndicators: ["Memikirkan aksesibilitas dan kondisi jaringan lambat", "Menggunakan data perilaku pengguna"],
+        redFlagIndicators: ["Mengabaikan masukan pengguna", "Fokus hanya pada keindahan teknis"],
+        situationalDilemma:
+          "Bagaimana Anda menyikapi masukan desain yang kontradiktif antara tim produk dan sales?",
+      },
+    ],
+  }),
+  nusantaraBackendGo: ScoringRubricSchema.parse({
+    roleSummary:
+      "Membangun sistem pembayaran real-time dengan skalabilitas jutaan transaksi per hari.",
+    domainWeight: 55,
+    implicitWeight: 45,
+    domainCriteria: [
+      {
+        topic: "Concurrency & High Throughput",
+        expectedDepth: "Penguasaan goroutines, channels, lock contention, dan pencegahan goroutine leak.",
+        probeQuestion:
+          "Ceritakan pengalaman Anda mengoptimalkan query Postgres yang mengalami deadlocks pada traffic puncak.",
+      },
+      {
+        topic: "Transactional Integrity",
+        expectedDepth: "Paham idempotency, distributed locks, saga/outbox pattern, dan kapan 2-phase commit layak dipakai.",
+        probeQuestion:
+          "Bagaimana Anda menjamin transaksi tidak terduplikasi saat terjadi timeout network pada webhook penyedia pembayaran?",
+      },
+    ],
+    implicitCriteria: [
+      {
+        traitName: "Engineering Rigor",
+        positiveIndicators: ["Menulis test untuk kasus kegagalan", "Menambahkan tracing dan metrik sebelum rilis"],
+        redFlagIndicators: ["Hanya menguji happy path", "Men-debug produksi tanpa observability"],
+        situationalDilemma:
+          "Product owner meminta fitur refund dirilis besok, tetapi belum ada test untuk skenario gagal bayar. Apa keputusan Anda?",
+      },
+      {
+        traitName: "Calm Under Outage",
+        positiveIndicators: ["Memitigasi dulu, lalu mencari akar masalah", "Berkomunikasi teratur dengan stakeholder"],
+        redFlagIndicators: ["Mengubah banyak hal sekaligus saat insiden", "Tidak memberi kabar ke tim"],
+        situationalDilemma:
+          "Tingkat kegagalan transaksi tiba-tiba naik 30% saat jam sibuk dan penyebabnya belum jelas. Apa langkah pertama Anda?",
+      },
+    ],
+  }),
+  kreasiJuniorFrontend: ScoringRubricSchema.parse({
+    roleSummary:
+      "Membangun antarmuka landing page dan website profil interaktif untuk klien UMKM.",
+    domainWeight: 60,
+    implicitWeight: 40,
+    domainCriteria: [
+      {
+        topic: "Frontend Basics",
+        expectedDepth: "Mampu membuat layout responsif dengan CSS modern dan memahami dasar manipulasi DOM.",
+        probeQuestion: "Bagaimana cara Anda memastikan website tampil rapi di layar ponsel maupun desktop?",
+      },
+      {
+        topic: "React Fundamentals",
+        expectedDepth: "Memahami props, state, dan lifecycle dasar komponen React.",
+        probeQuestion: "Ceritakan project pertama yang Anda buat menggunakan React dan tantangannya.",
+      },
+    ],
+    implicitCriteria: [
+      {
+        traitName: "Willingness to Learn",
+        positiveIndicators: ["Antusias mempelajari teknologi baru", "Menerima masukan code review dengan terbuka"],
+        redFlagIndicators: ["Defensif terhadap kritik", "Berhenti belajar setelah tutorial pertama"],
+        situationalDilemma:
+          "Senior Anda meminta Anda menulis ulang komponen yang sudah Anda kerjakan dua hari. Bagaimana tanggapan Anda?",
+      },
+      {
+        traitName: "Team Communication",
+        positiveIndicators: ["Aktif bertanya saat ragu", "Memberi update progres tanpa diminta"],
+        redFlagIndicators: ["Diam saat terhambat berhari-hari", "Tidak mengabari saat tenggat terancam"],
+        situationalDilemma:
+          "Anda terhambat bug selama setengah hari dan semua senior sedang rapat. Apa yang Anda lakukan?",
+      },
+    ],
+  }),
+};
+
+/** Seeded evaluation trait breakdowns, validated against CandidateEvaluationSchema. */
+const parseTraits = (traits: unknown) => CandidateEvaluationSchema.shape.traitBreakdown.parse(traits);
+
+const TRAIT_BREAKDOWNS = {
+  dewiAse: parseTraits([
+    {
+      criterion: "Containerization & Linux",
+      category: "DOMAIN",
+      score: 5,
+      evidenceQuote: "Pertama saya cek log kernel dmesg -T untuk konfirmasi OOM killer.",
+      analysis: "Menjelaskan mekanisme isolasi container dan debugging cgroups dengan presisi.",
+    },
+    {
+      criterion: "Stress Tolerance & On-Call",
+      category: "IMPLICIT",
+      score: 4,
+      evidenceQuote: "Kedua, pasang limit eksplisit memory dan swap di docker compose.",
+      analysis: "Memiliki prosedur yang jelas saat penanganan insiden darurat.",
+    },
+  ]),
+  dewiNusantara: parseTraits([
+    {
+      criterion: "Frontend Mastery",
+      category: "DOMAIN",
+      score: 5,
+      evidenceQuote: "Saya membagi komponen Server dan Client secara ketat, memanfaatkan Suspense boundaries untuk streaming.",
+      analysis: "Sangat fasih memisahkan server vs client components dan streaming SSR.",
+    },
+    {
+      criterion: "Velocity & Agility",
+      category: "IMPLICIT",
+      score: 5,
+      evidenceQuote: "...mengisolasi dynamic imports untuk bundle berat seperti charts.",
+      analysis: "Mampu menjelaskan release cycle cepat dan strategi rollback.",
+    },
+  ]),
+  bagasAse: parseTraits([
+    {
+      criterion: "Containerization & Linux",
+      category: "DOMAIN",
+      score: 5,
+      evidenceQuote: "Saya menggunakan eBPF tool seperti tcptop dan bcc tools untuk mengamati socket buffer queues.",
+      analysis: "Menjelaskan mekanisme cgroups v2, namespace isolation, dan kernel parameters secara sempurna.",
+    },
+    {
+      criterion: "Stress Tolerance & On-Call",
+      category: "IMPLICIT",
+      score: 5,
+      evidenceQuote: "...pada kernel level sebelum memeriksa layer aplikasi.",
+      analysis: "Memiliki playbook penanganan krisis infrastruktur yang sangat teruji.",
+    },
+  ]),
+  bagasNusantaraGo: parseTraits([
+    {
+      criterion: "Concurrency & High Throughput",
+      category: "DOMAIN",
+      score: 5,
+      evidenceQuote: "...menggunakan Kafka untuk event publishing, menjamin at-least-once delivery.",
+      analysis: "Paham betul alokasi memori runtime Go dan pencegahan goroutine leaks.",
+    },
+    {
+      criterion: "Transactional Integrity",
+      category: "DOMAIN",
+      score: 5,
+      evidenceQuote: "Saya lebih memilih Orchestration-based Saga dengan outbox pattern di PostgreSQL.",
+      analysis: "Pola Saga orchestration dengan outbox pattern sangat tepat sasaran.",
+    },
+  ]),
+  aisyahNusantara: parseTraits([
+    {
+      criterion: "Frontend Mastery",
+      category: "DOMAIN",
+      score: 5,
+      evidenceQuote: "Saya prioritaskan CSS transforms dan opacity yang terakselerasi GPU (will-change), menghindari layout thrashing.",
+      analysis: "Sangat menguasai CSS rendering tree dan rendering lifecycle Next.js.",
+    },
+    {
+      criterion: "User Empathy",
+      category: "IMPLICIT",
+      score: 5,
+      evidenceQuote: "...mengaudit frame rate menggunakan Chrome DevTools Performance panel.",
+      analysis: "Menyertakan pertimbangan pengguna berkebutuhan khusus dan slow-network fallbacks.",
+    },
+  ]),
+  rizkyAse: parseTraits([
+    {
+      criterion: "Containerization & Linux",
+      category: "DOMAIN",
+      score: 2,
+      evidenceQuote: "Saya biasanya pakai docker run biasa saja kak, belum pernah setting network custom di Linux.",
+      analysis: "Hanya familiar dengan perintah dasar docker run tanpa pemahaman kernel isolasi.",
+    },
+    {
+      criterion: "Stress Tolerance & On-Call",
+      category: "IMPLICIT",
+      score: 3,
+      evidenceQuote: "...belum pernah setting network custom di Linux.",
+      analysis: "Belum memiliki pengalaman menghadapi production incident di luar jam kerja.",
+    },
+  ]),
+};
 
 const prisma = new PrismaClient();
 
@@ -217,23 +504,7 @@ async function main() {
         implicitWeight: 50,
         requiredSkills: ["Docker", "Linux Kernel", "Go", "PostgreSQL"],
       },
-      scoringRubric: {
-        domainWeight: 50,
-        implicitWeight: 50,
-        domainTraits: [
-          { name: "Containerization & Linux", description: "Paham arsitektur Docker dan debugging sistem Linux", weight: 30 },
-          { name: "Distributed Systems", description: "Mengerti konsep konsistensi dan replication", weight: 20 },
-        ],
-        implicitTraits: [
-          { name: "Stress Tolerance & On-Call", description: "Ketenangan menghadapi outage sistem dan komunikasi proaktif", weight: 30 },
-          { name: "Ownership", description: "Tanggung jawab penuh hingga perbaikan tuntas", weight: 20 },
-        ],
-        probeScenarios: [
-          "Bagaimana langkah isolasi saat container menghabiskan seluruh memori host?",
-          "Ceritakan pengalaman ketika sistem produksi down mendadak di luar jam kerja.",
-          "Bagaimana cara Anda menyeimbangkan kualitas kode dengan deadline riset yang ketat?",
-        ],
-      },
+      scoringRubric: RUBRICS.aseSeniorSystems,
     },
     create: {
       title: "Senior Systems & Cloud Infrastructure Engineer",
@@ -248,23 +519,7 @@ async function main() {
         implicitWeight: 50,
         requiredSkills: ["Docker", "Linux Kernel", "Go", "PostgreSQL"],
       },
-      scoringRubric: {
-        domainWeight: 50,
-        implicitWeight: 50,
-        domainTraits: [
-          { name: "Containerization & Linux", description: "Paham arsitektur Docker dan debugging sistem Linux", weight: 30 },
-          { name: "Distributed Systems", description: "Mengerti konsep konsistensi dan replication", weight: 20 },
-        ],
-        implicitTraits: [
-          { name: "Stress Tolerance & On-Call", description: "Ketenangan menghadapi outage sistem dan komunikasi proaktif", weight: 30 },
-          { name: "Ownership", description: "Tanggung jawab penuh hingga perbaikan tuntas", weight: 20 },
-        ],
-        probeScenarios: [
-          "Bagaimana langkah isolasi saat container menghabiskan seluruh memori host?",
-          "Ceritakan pengalaman ketika sistem produksi down mendadak di luar jam kerja.",
-          "Bagaimana cara Anda menyeimbangkan kualitas kode dengan deadline riset yang ketat?",
-        ],
-      },
+      scoringRubric: RUBRICS.aseSeniorSystems,
     },
   });
   console.log(`✅ Job Requisition created/updated: ${aseJob1.title}`);
@@ -284,22 +539,7 @@ async function main() {
         implicitWeight: 40,
         requiredSkills: ["PyTorch", "Python", "LLM Evaluation", "CUDA", "FastAPI"],
       },
-      scoringRubric: {
-        domainWeight: 60,
-        implicitWeight: 40,
-        domainTraits: [
-          { name: "AI & Model Evaluation", description: "Keahlian metrik evaluasi model (MMLU, HumanEval) dan fine-tuning", weight: 35 },
-          { name: "High-Throughput Pipelines", description: "Pengoptimalan throughput inferensi dan batch processing", weight: 25 },
-        ],
-        implicitTraits: [
-          { name: "Research Rigor", description: "Ketelitian mencatat log eksperimen dan integritas data", weight: 20 },
-          { name: "Academic Communication", description: "Kejelasan menyampaikan metodologi dan hipotesis penelitian", weight: 20 },
-        ],
-        probeScenarios: [
-          "Bagaimana Anda mendeteksi data contamination saat mengevaluasi benchmark penalaran model bahasa?",
-          "Bagaimana cara mengatasi CUDA Out of Memory saat training multi-GPU tanpa mengurangi batch size secara drastis?",
-        ],
-      },
+      scoringRubric: RUBRICS.aseAiResearcher,
     },
     create: {
       title: "AI Systems & Distributed Computing Researcher",
@@ -314,22 +554,7 @@ async function main() {
         implicitWeight: 40,
         requiredSkills: ["PyTorch", "Python", "LLM Evaluation", "CUDA", "FastAPI"],
       },
-      scoringRubric: {
-        domainWeight: 60,
-        implicitWeight: 40,
-        domainTraits: [
-          { name: "AI & Model Evaluation", description: "Keahlian metrik evaluasi model (MMLU, HumanEval) dan fine-tuning", weight: 35 },
-          { name: "High-Throughput Pipelines", description: "Pengoptimalan throughput inferensi dan batch processing", weight: 25 },
-        ],
-        implicitTraits: [
-          { name: "Research Rigor", description: "Ketelitian mencatat log eksperimen dan integritas data", weight: 20 },
-          { name: "Academic Communication", description: "Kejelasan menyampaikan metodologi dan hipotesis penelitian", weight: 20 },
-        ],
-        probeScenarios: [
-          "Bagaimana Anda mendeteksi data contamination saat mengevaluasi benchmark penalaran model bahasa?",
-          "Bagaimana cara mengatasi CUDA Out of Memory saat training multi-GPU tanpa mengurangi batch size secara drastis?",
-        ],
-      },
+      scoringRubric: RUBRICS.aseAiResearcher,
     },
   });
   console.log(`✅ Job Requisition created/updated: ${aseJob2.title}`);
@@ -417,23 +642,7 @@ async function main() {
         implicitWeight: 50,
         requiredSkills: ["Next.js", "TypeScript", "Tailwind CSS", "Node.js"],
       },
-      scoringRubric: {
-        domainWeight: 50,
-        implicitWeight: 50,
-        domainTraits: [
-          { name: "Frontend Mastery", description: "Penguasaan komponen reaktif Next.js dan performa web", weight: 30 },
-          { name: "API & Data Modeling", description: "Desain RESTful API dan skema database relasional", weight: 20 },
-        ],
-        implicitTraits: [
-          { name: "Velocity & Agility", description: "Kecepatan adaptasi dengan requirement produk yang dinamis", weight: 30 },
-          { name: "User Empathy", description: "Kepedulian terhadap kemudahan pengguna akhir", weight: 20 },
-        ],
-        probeScenarios: [
-          "Bagaimana Anda merancang state management untuk form checkout bertingkat?",
-          "Ceritakan saat Anda harus merilis hotfix di tengah traffic pengguna yang tinggi.",
-          "Bagaimana Anda menyikapi masukan desain yang kontradiktif antara tim produk dan sales?",
-        ],
-      },
+      scoringRubric: RUBRICS.nusantaraFullstack,
     },
     create: {
       title: "Fullstack Product Engineer (Next.js & TypeScript)",
@@ -448,23 +657,7 @@ async function main() {
         implicitWeight: 50,
         requiredSkills: ["Next.js", "TypeScript", "Tailwind CSS", "Node.js"],
       },
-      scoringRubric: {
-        domainWeight: 50,
-        implicitWeight: 50,
-        domainTraits: [
-          { name: "Frontend Mastery", description: "Penguasaan komponen reaktif Next.js dan performa web", weight: 30 },
-          { name: "API & Data Modeling", description: "Desain RESTful API dan skema database relasional", weight: 20 },
-        ],
-        implicitTraits: [
-          { name: "Velocity & Agility", description: "Kecepatan adaptasi dengan requirement produk yang dinamis", weight: 30 },
-          { name: "User Empathy", description: "Kepedulian terhadap kemudahan pengguna akhir", weight: 20 },
-        ],
-        probeScenarios: [
-          "Bagaimana Anda merancang state management untuk form checkout bertingkat?",
-          "Ceritakan saat Anda harus merilis hotfix di tengah traffic pengguna yang tinggi.",
-          "Bagaimana Anda menyikapi masukan desain yang kontradiktif antara tim produk dan sales?",
-        ],
-      },
+      scoringRubric: RUBRICS.nusantaraFullstack,
     },
   });
   console.log(`✅ Job Requisition created/updated: ${nusantaraJob1.title}`);
@@ -484,22 +677,7 @@ async function main() {
         implicitWeight: 45,
         requiredSkills: ["Go", "Kafka", "PostgreSQL", "Redis", "Distributed Transactions"],
       },
-      scoringRubric: {
-        domainWeight: 55,
-        implicitWeight: 45,
-        domainTraits: [
-          { name: "Concurrency & High Throughput", description: "Penguasaan Go goroutines, channels, dan lock contention", weight: 30 },
-          { name: "Transactional Integrity", description: "Paham 2-phase commit, idempotency, dan distributed locks", weight: 25 },
-        ],
-        implicitTraits: [
-          { name: "Engineering Rigor", description: "Testing intensif, error tracing, dan observability", weight: 25 },
-          { name: "Calm Under Outage", description: "Mitigasi kegagalan transaksi secara cepat dan teratur", weight: 20 },
-        ],
-        probeScenarios: [
-          "Bagaimana Anda menjamin transaksi tidak terduplikasi saat terjadi timeout network pada webhook penyedia pembayaran?",
-          "Ceritakan pengalaman Anda mengoptimalkan query Postgres yang mengalami deadlocks pada traffic puncak.",
-        ],
-      },
+      scoringRubric: RUBRICS.nusantaraBackendGo,
     },
     create: {
       title: "Backend Distributed Systems Engineer (Go)",
@@ -514,22 +692,7 @@ async function main() {
         implicitWeight: 45,
         requiredSkills: ["Go", "Kafka", "PostgreSQL", "Redis", "Distributed Transactions"],
       },
-      scoringRubric: {
-        domainWeight: 55,
-        implicitWeight: 45,
-        domainTraits: [
-          { name: "Concurrency & High Throughput", description: "Penguasaan Go goroutines, channels, dan lock contention", weight: 30 },
-          { name: "Transactional Integrity", description: "Paham 2-phase commit, idempotency, dan distributed locks", weight: 25 },
-        ],
-        implicitTraits: [
-          { name: "Engineering Rigor", description: "Testing intensif, error tracing, dan observability", weight: 25 },
-          { name: "Calm Under Outage", description: "Mitigasi kegagalan transaksi secara cepat dan teratur", weight: 20 },
-        ],
-        probeScenarios: [
-          "Bagaimana Anda menjamin transaksi tidak terduplikasi saat terjadi timeout network pada webhook penyedia pembayaran?",
-          "Ceritakan pengalaman Anda mengoptimalkan query Postgres yang mengalami deadlocks pada traffic puncak.",
-        ],
-      },
+      scoringRubric: RUBRICS.nusantaraBackendGo,
     },
   });
   console.log(`✅ Job Requisition created/updated: ${nusantaraJob2.title}`);
@@ -615,22 +778,7 @@ async function main() {
         implicitWeight: 40,
         requiredSkills: ["HTML5", "CSS3", "JavaScript", "React"],
       },
-      scoringRubric: {
-        domainWeight: 60,
-        implicitWeight: 40,
-        domainTraits: [
-          { name: "Frontend Basics", description: "Kemampuan styling responsif dan manipulasi DOM", weight: 35 },
-          { name: "React Fundamentals", description: "Pemahaman props, state, dan lifecycle dasar", weight: 25 },
-        ],
-        implicitTraits: [
-          { name: "Willingness to Learn", description: "Antusiasme mempelajari teknologi baru dan menerima masukan", weight: 25 },
-          { name: "Team Communication", description: "Keaktifan bertanya dan berdiskusi", weight: 15 },
-        ],
-        probeScenarios: [
-          "Ceritakan project pertama yang Anda buat menggunakan React dan tantangannya.",
-          "Bagaimana cara Anda memastikan website tampil rapi di layar ponsel maupun desktop?",
-        ],
-      },
+      scoringRubric: RUBRICS.kreasiJuniorFrontend,
     },
     create: {
       title: "Junior Frontend Web Developer",
@@ -645,22 +793,7 @@ async function main() {
         implicitWeight: 40,
         requiredSkills: ["HTML5", "CSS3", "JavaScript", "React"],
       },
-      scoringRubric: {
-        domainWeight: 60,
-        implicitWeight: 40,
-        domainTraits: [
-          { name: "Frontend Basics", description: "Kemampuan styling responsif dan manipulasi DOM", weight: 35 },
-          { name: "React Fundamentals", description: "Pemahaman props, state, dan lifecycle dasar", weight: 25 },
-        ],
-        implicitTraits: [
-          { name: "Willingness to Learn", description: "Antusiasme mempelajari teknologi baru dan menerima masukan", weight: 25 },
-          { name: "Team Communication", description: "Keaktifan bertanya dan berdiskusi", weight: 15 },
-        ],
-        probeScenarios: [
-          "Ceritakan project pertama yang Anda buat menggunakan React dan tantangannya.",
-          "Bagaimana cara Anda memastikan website tampil rapi di layar ponsel maupun desktop?",
-        ],
-      },
+      scoringRubric: RUBRICS.kreasiJuniorFrontend,
     },
   });
   console.log(`✅ Job Requisition created/updated: ${kreasiJob1.title}`);
@@ -779,10 +912,7 @@ async function main() {
       greenFlags: ["Pengalaman praktis Linux & Docker kuat", "Rendah hati dan fokus pada akar masalah", "Prosedur insiden sistematis"],
       redFlags: [],
       finalInterviewProbes: ["Gali arsitektur cluster Kubernetes dan pipeline CI/CD yang pernah dikelola"],
-      traitBreakdown: [
-        { traitName: "Containerization & Linux", score: 95, reasoning: "Menjelaskan mekanisme isolasi container dan debugging cgroups dengan presisi." },
-        { traitName: "Stress Tolerance & On-Call", score: 88, reasoning: "Memiliki prosedur yang jelas saat penanganan insiden darurat." },
-      ],
+      traitBreakdown: TRAIT_BREAKDOWNS.dewiAse,
     },
     create: {
       applicationId: dewiAppAse.id,
@@ -795,10 +925,7 @@ async function main() {
       greenFlags: ["Pengalaman praktis Linux & Docker kuat", "Rendah hati dan fokus pada akar masalah", "Prosedur insiden sistematis"],
       redFlags: [],
       finalInterviewProbes: ["Gali arsitektur cluster Kubernetes dan pipeline CI/CD yang pernah dikelola"],
-      traitBreakdown: [
-        { traitName: "Containerization & Linux", score: 95, reasoning: "Menjelaskan mekanisme isolasi container dan debugging cgroups dengan presisi." },
-        { traitName: "Stress Tolerance & On-Call", score: 88, reasoning: "Memiliki prosedur yang jelas saat penanganan insiden darurat." },
-      ],
+      traitBreakdown: TRAIT_BREAKDOWNS.dewiAse,
     },
   });
 
@@ -860,10 +987,7 @@ async function main() {
       greenFlags: ["Penguasaan Next.js Server Components tinggi", "User-first thinking pada form checkout"],
       redFlags: [],
       finalInterviewProbes: ["Tanyakan preferensi state management untuk aplikasi fintech skala besar"],
-      traitBreakdown: [
-        { traitName: "Frontend Mastery", score: 96, reasoning: "Sangat fasih memisahkan server vs client components dan streaming SSR." },
-        { traitName: "Velocity & Agility", score: 92, reasoning: "Mampu menjelaskan release cycle cepat dan strategi rollback." },
-      ],
+      traitBreakdown: TRAIT_BREAKDOWNS.dewiNusantara,
     },
     create: {
       applicationId: dewiAppNusantara.id,
@@ -876,10 +1000,7 @@ async function main() {
       greenFlags: ["Penguasaan Next.js Server Components tinggi", "User-first thinking pada form checkout"],
       redFlags: [],
       finalInterviewProbes: ["Tanyakan preferensi state management untuk aplikasi fintech skala besar"],
-      traitBreakdown: [
-        { traitName: "Frontend Mastery", score: 96, reasoning: "Sangat fasih memisahkan server vs client components dan streaming SSR." },
-        { traitName: "Velocity & Agility", score: 92, reasoning: "Mampu menjelaskan release cycle cepat dan strategi rollback." },
-      ],
+      traitBreakdown: TRAIT_BREAKDOWNS.dewiNusantara,
     },
   });
 
@@ -1131,10 +1252,7 @@ async function main() {
       greenFlags: ["Pemahaman mendalam eBPF dan networking stack Linux", "Root-cause analysis berorientasi sistem", "Kepemimpinan on-call teruji"],
       redFlags: [],
       finalInterviewProbes: ["Diskusikan ekspektasi kompensasi dan kesiapan memandu riset asisten lab mahasiswa"],
-      traitBreakdown: [
-        { traitName: "Containerization & Linux", score: 99, reasoning: "Menjelaskan mekanisme cgroups v2, namespace isolation, dan kernel parameters secara sempurna." },
-        { traitName: "Stress Tolerance & On-Call", score: 94, reasoning: "Memiliki playbook penanganan krisis infrastruktur yang sangat teruji." },
-      ],
+      traitBreakdown: TRAIT_BREAKDOWNS.bagasAse,
     },
     create: {
       applicationId: bagasAppAse.id,
@@ -1147,10 +1265,7 @@ async function main() {
       greenFlags: ["Pemahaman mendalam eBPF dan networking stack Linux", "Root-cause analysis berorientasi sistem", "Kepemimpinan on-call teruji"],
       redFlags: [],
       finalInterviewProbes: ["Diskusikan ekspektasi kompensasi dan kesiapan memandu riset asisten lab mahasiswa"],
-      traitBreakdown: [
-        { traitName: "Containerization & Linux", score: 99, reasoning: "Menjelaskan mekanisme cgroups v2, namespace isolation, dan kernel parameters secara sempurna." },
-        { traitName: "Stress Tolerance & On-Call", score: 94, reasoning: "Memiliki playbook penanganan krisis infrastruktur yang sangat teruji." },
-      ],
+      traitBreakdown: TRAIT_BREAKDOWNS.bagasAse,
     },
   });
 
@@ -1212,10 +1327,7 @@ async function main() {
       greenFlags: ["Pemahaman transactional outbox pattern sempurna", "Pengalaman optimasi throughput Kafka"],
       redFlags: [],
       finalInterviewProbes: ["Tanyakan preferensi observabilitas open-telemetry vs custom metrics collector"],
-      traitBreakdown: [
-        { traitName: "Concurrency & High Throughput", score: 98, reasoning: "Paham betul alokasi memori runtime Go dan pencegahan goroutine leaks." },
-        { traitName: "Transactional Integrity", score: 96, reasoning: "Pola Saga orchestration dengan outbox pattern sangat tepat sasaran." },
-      ],
+      traitBreakdown: TRAIT_BREAKDOWNS.bagasNusantaraGo,
     },
     create: {
       applicationId: bagasAppNusantaraGo.id,
@@ -1228,10 +1340,7 @@ async function main() {
       greenFlags: ["Pemahaman transactional outbox pattern sempurna", "Pengalaman optimasi throughput Kafka"],
       redFlags: [],
       finalInterviewProbes: ["Tanyakan preferensi observabilitas open-telemetry vs custom metrics collector"],
-      traitBreakdown: [
-        { traitName: "Concurrency & High Throughput", score: 98, reasoning: "Paham betul alokasi memori runtime Go dan pencegahan goroutine leaks." },
-        { traitName: "Transactional Integrity", score: 96, reasoning: "Pola Saga orchestration dengan outbox pattern sangat tepat sasaran." },
-      ],
+      traitBreakdown: TRAIT_BREAKDOWNS.bagasNusantaraGo,
     },
   });
 
@@ -1337,10 +1446,7 @@ async function main() {
       greenFlags: ["Perhatian luar biasa pada user empathy dan aksesibilitas", "Pemahaman optimasi render pipeline browser"],
       redFlags: [],
       finalInterviewProbes: ["Gali pemahaman arsitektur database relasional dan optimasi query PostgreSQL"],
-      traitBreakdown: [
-        { traitName: "Frontend Mastery", score: 95, reasoning: "Sangat menguasai CSS rendering tree dan rendering lifecycle Next.js." },
-        { traitName: "User Empathy", score: 92, reasoning: "Menyertakan pertimbangan pengguna berkebutuhan khusus dan slow-network fallbacks." },
-      ],
+      traitBreakdown: TRAIT_BREAKDOWNS.aisyahNusantara,
     },
     create: {
       applicationId: aisyahAppNusantara.id,
@@ -1353,10 +1459,7 @@ async function main() {
       greenFlags: ["Perhatian luar biasa pada user empathy dan aksesibilitas", "Pemahaman optimasi render pipeline browser"],
       redFlags: [],
       finalInterviewProbes: ["Gali pemahaman arsitektur database relasional dan optimasi query PostgreSQL"],
-      traitBreakdown: [
-        { traitName: "Frontend Mastery", score: 95, reasoning: "Sangat menguasai CSS rendering tree dan rendering lifecycle Next.js." },
-        { traitName: "User Empathy", score: 92, reasoning: "Menyertakan pertimbangan pengguna berkebutuhan khusus dan slow-network fallbacks." },
-      ],
+      traitBreakdown: TRAIT_BREAKDOWNS.aisyahNusantara,
     },
   });
 
@@ -1462,10 +1565,7 @@ async function main() {
       greenFlags: ["Jujur mengakui batasan pengetahuan"],
       redFlags: ["Tidak memiliki pengalaman praktis Linux server production", "Jawaban dangkal terkait isolasi cgroups dan failure recovery"],
       finalInterviewProbes: ["Sarankan program pelatihan magang dasar sebelum melamar posisi Senior"],
-      traitBreakdown: [
-        { traitName: "Containerization & Linux", score: 45, reasoning: "Hanya familiar dengan perintah dasar docker run tanpa pemahaman kernel isolasi." },
-        { traitName: "Stress Tolerance & On-Call", score: 58, reasoning: "Belum memiliki pengalaman menghadapi production incident di luar jam kerja." },
-      ],
+      traitBreakdown: TRAIT_BREAKDOWNS.rizkyAse,
     },
     create: {
       applicationId: rizkyAppAse.id,
@@ -1478,10 +1578,7 @@ async function main() {
       greenFlags: ["Jujur mengakui batasan pengetahuan"],
       redFlags: ["Tidak memiliki pengalaman praktis Linux server production", "Jawaban dangkal terkait isolasi cgroups dan failure recovery"],
       finalInterviewProbes: ["Sarankan program pelatihan magang dasar sebelum melamar posisi Senior"],
-      traitBreakdown: [
-        { traitName: "Containerization & Linux", score: 45, reasoning: "Hanya familiar dengan perintah dasar docker run tanpa pemahaman kernel isolasi." },
-        { traitName: "Stress Tolerance & On-Call", score: 58, reasoning: "Belum memiliki pengalaman menghadapi production incident di luar jam kerja." },
-      ],
+      traitBreakdown: TRAIT_BREAKDOWNS.rizkyAse,
     },
   });
 
