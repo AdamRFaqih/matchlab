@@ -54,7 +54,7 @@ export async function evaluateCandidateTranscript(
   }));
 
   try {
-    const rawEvaluation = await evaluateTranscriptWithAi({
+    const generatedEvaluation = await evaluateTranscriptWithAi({
       jobTitle: job.title,
       rubric,
       candidateName: candidateProfile.user.name,
@@ -62,9 +62,13 @@ export async function evaluateCandidateTranscript(
       messages: messagesForAi,
     });
 
-    const parsedEvaluation = CandidateEvaluationSchema.parse(rawEvaluation);
+    const parsedEvaluation = CandidateEvaluationSchema.parse(generatedEvaluation.evaluation);
 
-    await saveEvaluationRecord(applicationId, parsedEvaluation);
+    await saveEvaluationRecord(
+      applicationId,
+      parsedEvaluation,
+      generatedEvaluation.usage.totalTokens
+    );
 
     return {
       success: true,
