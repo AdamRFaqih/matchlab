@@ -6,6 +6,7 @@ import {
   type ScoringRubric,
 } from "./schemas";
 import type { ChatMessageItem } from "./interviewer";
+import { EMPTY_AI_USAGE, normalizeAiUsage, type AiUsage } from "./usage";
 
 const EVALUATOR_SYSTEM_PROMPT = `
 Anda adalah MatchLab AI Talent Judge & Evaluator profesional.
@@ -30,6 +31,11 @@ export interface EvaluateTranscriptParams {
   cvSummary: string;
   messages: ChatMessageItem[];
   cultureDescription?: string;
+}
+
+export interface EvaluateTranscriptResult {
+  evaluation: CandidateEvaluation;
+  usage: AiUsage;
 }
 
 function generateFallbackEvaluation(params: EvaluateTranscriptParams): CandidateEvaluation {
@@ -89,11 +95,11 @@ function generateFallbackEvaluation(params: EvaluateTranscriptParams): Candidate
 
 export async function evaluateTranscriptWithAi(
   params: EvaluateTranscriptParams
-): Promise<CandidateEvaluation> {
+): Promise<EvaluateTranscriptResult> {
   const model = getAiModel("AI_MODEL_EVALUATOR", "gemini-2.5-pro");
 
   if (!model) {
-    return generateFallbackEvaluation(params);
+    return { evaluation: generateFallbackEvaluation(params), usage: EMPTY_AI_USAGE };
   }
 
   const { jobTitle, rubric, candidateName, cvSummary, messages, cultureDescription } = params;
@@ -144,9 +150,12 @@ Lakukan analisis mendalam terhadap transkrip di atas dan hasilkan objek Candidat
         100
     );
 
-    return evalObj;
+    return {
+      evaluation: evalObj,
+      usage: normalizeAiUsage(result.usage),
+    };
   } catch (err) {
     console.warn("AI Evaluator call failed, falling back to heuristic evaluation:", err);
-    return generateFallbackEvaluation(params);
+    return { evaluation: generateFallbackEvaluation(params), usage: EMPTY_AI_USAGE };
   }
 }
