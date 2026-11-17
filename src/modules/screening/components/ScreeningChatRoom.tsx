@@ -91,6 +91,10 @@ export function ScreeningChatRoom({ initialSession }: ScreeningChatRoomProps) {
       }
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Terjadi gangguan koneksi.");
+      setSession((prev) => ({
+        ...prev,
+        messages: prev.messages.filter((m) => m.id !== optimisticUserMessage.id),
+      }));
       setInputValue(trimmed);
     } finally {
       setIsSending(false);
