@@ -4,7 +4,8 @@ import type { CandidateEvaluation } from "@/lib/ai/schemas";
 
 export async function saveEvaluationRecord(
   applicationId: string,
-  evaluation: CandidateEvaluation
+  evaluation: CandidateEvaluation,
+  evalTokensUsed: number = 0
 ) {
   const traitBreakdownJson = evaluation.traitBreakdown as unknown as Prisma.InputJsonValue;
 
@@ -21,6 +22,7 @@ export async function saveEvaluationRecord(
         greenFlags: evaluation.greenFlags,
         redFlags: evaluation.redFlags,
         finalInterviewProbes: evaluation.finalInterviewProbes,
+        evalTokensUsed,
       },
       update: {
         matchScore: evaluation.matchScore,
@@ -31,6 +33,7 @@ export async function saveEvaluationRecord(
         greenFlags: evaluation.greenFlags,
         redFlags: evaluation.redFlags,
         finalInterviewProbes: evaluation.finalInterviewProbes,
+        evalTokensUsed: { increment: evalTokensUsed },
       },
     });
 

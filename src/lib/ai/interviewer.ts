@@ -1,6 +1,7 @@
 import { generateText } from "ai";
 import { getAiModel } from "./models";
 import type { ScoringRubric } from "./schemas";
+import { EMPTY_AI_USAGE, normalizeAiUsage, type AiUsage } from "./usage";
 
 export interface ChatMessageItem {
   role: "user" | "assistant";
@@ -17,6 +18,11 @@ export interface GenerateInterviewReplyParams {
   currentTurn: number; // 1-indexed turn that user just completed
   maxTurns: number;
   candidateMessage: string;
+}
+
+export interface GenerateInterviewReplyResult {
+  text: string;
+  usage: AiUsage;
 }
 
 export function sanitizeCandidateInput(input: string): string {
@@ -117,7 +123,7 @@ Apa prinsip kerja atau komitmen pribadi yang selalu kamu pegang ketika bekerja d
 
 export async function generateInterviewReply(
   params: GenerateInterviewReplyParams
-): Promise<string> {
+): Promise<GenerateInterviewReplyResult> {
   const {
     jobTitle,
     candidateName,
@@ -130,13 +136,19 @@ export async function generateInterviewReply(
   } = params;
 
   if (currentTurn >= maxTurns) {
-    return getFallbackReply(candidateName, currentTurn, maxTurns, rubric);
+    return {
+      text: getFallbackReply(candidateName, currentTurn, maxTurns, rubric),
+      usage: EMPTY_AI_USAGE,
+    };
   }
 
   const model = getAiModel("AI_MODEL_INTERVIEWER");
 
   if (!model) {
-    return getFallbackReply(candidateName, currentTurn, maxTurns, rubric);
+    return {
+      text: getFallbackReply(candidateName, currentTurn, maxTurns, rubric),
+      usage: EMPTY_AI_USAGE,
+    };
   }
 
   const systemPrompt = `
@@ -197,9 +209,15 @@ GAYA KOMUNIKASI:
       maxTokens: 500,
     });
 
-    return response.text.trim();
+    return {
+      text: response.text.trim(),
+      usage: normalizeAiUsage(response.usage),
+    };
   } catch (err) {
     console.warn("AI Interviewer API error, using structured fallback reply:", err);
-    return getFallbackReply(candidateName, currentTurn, maxTurns, rubric);
+    return {
+      text: getFallbackReply(candidateName, currentTurn, maxTurns, rubric),
+      usage: EMPTY_AI_USAGE,
+    };
   }
 }

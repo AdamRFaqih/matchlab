@@ -8,8 +8,10 @@ import {
 import {
   getInitialGreetingMessage,
   generateInterviewReply,
+  type GenerateInterviewReplyResult,
   type ChatMessageItem,
 } from "@/lib/ai/interviewer";
+import { EMPTY_AI_USAGE } from "@/lib/ai/usage";
 import { ScoringRubricSchema } from "@/lib/ai/schemas";
 import { evaluateCandidateTranscript } from "@/modules/evaluation/service";
 import { QuotaExceededError } from "@/lib/billing/quota";
@@ -221,8 +223,9 @@ export async function sendCandidateMessage(
   ];
 
   let replyContent = "";
+  let replyUsage = EMPTY_AI_USAGE;
   try {
-    replyContent = await generateInterviewReply({
+    const generatedReply: GenerateInterviewReplyResult = await generateInterviewReply({
       jobTitle: job.title,
       rubric,
       candidateName: candidateProfile.user.name,
@@ -232,6 +235,8 @@ export async function sendCandidateMessage(
       currentTurn: newTurnCount,
       maxTurns,
     });
+    replyContent = generatedReply.text;
+    replyUsage = generatedReply.usage;
   } catch (err) {
     console.error("AI reply generation error:", err);
     replyContent =
@@ -256,7 +261,7 @@ export async function sendCandidateMessage(
     updatedMessages as unknown as object,
     newTurnCount,
     isFinalTurn,
-    0
+    replyUsage.totalTokens
   );
 
   // When interview finishes (reaches max turns), trigger evaluation automatically in the background
